@@ -354,7 +354,7 @@ All of these use the same load operator:
 
 The panel is a tab named "Slicer Anim" in the sidebar of the 3D view. It has four sections, in the order that you use them:
 
-1. Source: the load buttons from 11.2, Reload (section 7), and a summary of slicer, layer count, print time, and point count.
+1. Source: the load buttons from 11.2, Reload (section 7), a summary of slicer, layer count, print time, and point count, and Reset to Defaults. Reset to Defaults asks you to confirm. Then it sets the Look and Output settings and the shot list back to their defaults and runs Rebuild. The loaded print stays.
 2. Look: color, finish, highlight, ghost, strand detail, backdrop, plate mat, nozzle tip.
 3. Shots: the shot list, with buttons to add, remove, and move shots.
 4. Output: the settings from 11.1, plus Rebuild, Preview, and Render.

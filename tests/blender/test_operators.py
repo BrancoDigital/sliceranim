@@ -126,3 +126,23 @@ def test_end_makes_the_shot_a_hold_shot():
     s.shots[2].start_at_end = False
     assert s.shots[2].start_layer == 46
     assert not shots.problems(bpy.context.scene)
+
+
+def test_reset_to_defaults_restores_look_shots_and_output():
+    """Owner check: a way back from any change, for example a shot list that went red."""
+    run_load(CUBE)
+    s = settings()
+    s.finish, s.lights, s.fps, s.output_folder = "GLOSSY", False, "60", "//elsewhere/"
+    s.shots[0].duration = 9.0
+    s.shots[1].start_at_end = False
+    assert bpy.ops.sliceranim.reset_defaults() == {"FINISHED"}
+    assert (s.finish, s.lights, s.fps, s.output_folder) == ("MATTE", True, "30", "//renders/")
+    assert [(x.start_at_end, x.duration, x.style) for x in s.shots] == [(False, 20.0, "LINE"), (True, 4.0, "HOLD")]
+    assert s.toolpath_object is not None and s.layer_count == 3
+    assert bpy.data.objects.get("SA Key Light") is not None
+    assert bpy.context.scene.render.fps == 30
+    assert not shots.needs_rebuild(bpy.context.scene)
+
+
+def test_reset_to_defaults_is_off_without_a_toolpath_object():
+    assert not bpy.ops.sliceranim.reset_defaults.poll()

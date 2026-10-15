@@ -7,7 +7,7 @@ from bpy.props import BoolProperty, CollectionProperty, EnumProperty, StringProp
 
 from ..core.errors import OPEN_MESH, SlicerAnimError, too_many_polygons
 from ..core.toolpaths import estimate_polygons
-from . import importer, output, preview, shots
+from . import importer, looks, nodes, output, preview, props, shots
 
 _pending = {}  # a large print that waits for the user to confirm (spec section 7)
 
@@ -177,6 +177,50 @@ class SLICERANIM_OT_shot_move(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def reset_to_defaults(scene) -> None:
+    """Set the Look and Output settings and the shot list back to their defaults, then run Rebuild."""
+    settings = scene.sliceranim
+    for name in props.USER_SETTINGS:
+        settings.property_unset(name)
+    nodes.apply_settings(scene)
+    looks.apply(scene)
+    output.apply(scene)
+    shots.fill_default_shots(settings, settings.layer_count)
+    shots.rebuild(scene)
+
+
+class SLICERANIM_OT_reset_defaults(bpy.types.Operator):
+    """Set the look, the shot list, and the output settings back to their defaults"""
+
+    bl_idname = "sliceranim.reset_defaults"
+    bl_label = "Reset to Defaults"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.sliceranim.toolpath_object is not None
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(
+            self,
+            event,
+            title="Reset to Defaults",
+            message="Reset sets the look, the shot list, and the output settings back to their defaults. "
+            "The loaded print stays.",
+            confirm_text="Reset",
+        )
+
+    def execute(self, context):
+        if context.scene.sliceranim.preview_active:
+            preview.stop(context)
+        try:
+            reset_to_defaults(context.scene)
+        except SlicerAnimError as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
+        return {"FINISHED"}
+
+
 class SLICERANIM_OT_rebuild(bpy.types.Operator):
     """Write the keyframes, markers, and cameras for the shot list"""
 
@@ -271,6 +315,7 @@ class SLICERANIM_PT_source(_Panel, bpy.types.Panel):
         box.label(text=f"{settings.point_count:,} points")
         if settings.used_fallback:
             box.label(text="Fallback slicer: 2 walls, no infill.", icon="INFO")
+        layout.operator(SLICERANIM_OT_reset_defaults.bl_idname, icon="LOOP_BACK")
 
 
 class SLICERANIM_PT_look(_Panel, bpy.types.Panel):
@@ -389,6 +434,7 @@ CLASSES = (
     SLICERANIM_OT_shot_add,
     SLICERANIM_OT_shot_remove,
     SLICERANIM_OT_shot_move,
+    SLICERANIM_OT_reset_defaults,
     SLICERANIM_OT_rebuild,
     SLICERANIM_OT_render,
     SLICERANIM_UL_shots,

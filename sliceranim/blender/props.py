@@ -163,6 +163,15 @@ class SLICERANIM_PG_settings(bpy.types.PropertyGroup):
     preview_state: StringProperty()
 
 
+# The settings in the Look and Output sections. Reset to Defaults sets them back to their defaults.
+USER_SETTINGS = (
+    "use_file_color", "color", "finish", "highlight", "highlight_color", "highlight_layers",
+    "ghost", "ghost_use_filament_color", "ghost_color", "ghost_opacity",
+    "strand_sides", "viewport_strand_sides", "merge_angle", "backdrop", "backdrop_color",
+    "lights", "plate_mat", "nozzle",
+    "format_preset", "custom_width", "custom_height", "fps", "file_type", "output_folder",
+)
+
 CLASSES = (SLICERANIM_PG_shot, SLICERANIM_PG_settings)
 
 

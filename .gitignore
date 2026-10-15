@@ -16,3 +16,8 @@ slices/
 
 # Rendered videos
 renders/
+
+# Development
+.venv/
+.pytest_cache/
+dist/

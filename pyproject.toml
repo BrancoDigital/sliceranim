@@ -1,0 +1,4 @@
+# Test configuration only. The extension itself is built from sliceranim/blender_manifest.toml.
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+pythonpath = ["."]

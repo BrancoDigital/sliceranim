@@ -27,6 +27,7 @@ def start(context) -> None:
         "shading": space.shading.type,
         "scene_lights": space.shading.use_scene_lights,
         "scene_world": space.shading.use_scene_world,
+        "overlays": space.overlay.show_overlays,
         "sync": scene.sync_mode,
     }
     settings.preview_state = json.dumps(state)
@@ -34,6 +35,7 @@ def start(context) -> None:
     space.shading.type = "MATERIAL"
     space.shading.use_scene_lights = True
     space.shading.use_scene_world = True
+    space.overlay.show_overlays = False
     scene.frame_set(1)
     space.region_3d.view_perspective = "CAMERA"
     settings.preview_active = True
@@ -54,6 +56,7 @@ def stop(context) -> None:
         space.shading.type = state["shading"]
         space.shading.use_scene_lights = state["scene_lights"]
         space.shading.use_scene_world = state["scene_world"]
+        space.overlay.show_overlays = state.get("overlays", True)
     if state:
         scene.sync_mode = state["sync"]
     settings.preview_active = False

@@ -370,6 +370,7 @@ Preview plays the video in the 3D view. It does not render, and you do not chang
 1. If the shot list or the timing changed since the last Rebuild, run Rebuild.
 2. Set the 3D view to look through the scene camera. The timeline markers switch the camera at each shot, as in the render.
 3. Set the shading of the 3D view to Material Preview, with the scene lights and the scene world on. The preview then shows the filament material, the highlight, the ghost, and the backdrop.
+   It also turns off the overlays, so that camera frames, light lines, and the grid do not cover the part.
 4. Set playback to drop frames when the 3D view is slow, so the video plays at its real speed.
 5. Start playback at frame 1.
 

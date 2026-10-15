@@ -39,3 +39,14 @@ def test_preview_runs_rebuild_first_when_the_shots_changed():
 
 def test_preview_is_off_without_a_toolpath_object():
     assert not bpy.ops.sliceranim.preview.poll()
+
+
+def test_preview_hides_the_overlays_and_exit_shows_them_again():
+    """Camera frames, light lines, and the grid cover the part during Preview (owner check)."""
+    load(CUBE)
+    space = view3d_space()
+    space.overlay.show_overlays = True
+    bpy.ops.sliceranim.preview()
+    assert not space.overlay.show_overlays
+    bpy.ops.sliceranim.preview()
+    assert space.overlay.show_overlays

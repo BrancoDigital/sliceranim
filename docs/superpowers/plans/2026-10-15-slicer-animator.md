@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-slicer-animator-design.md` (approved on 2026-10-15). Read it before you start.
 
-**How this plan was checked:** On 2026-10-15, every file in this plan was written in a scratch copy of the repository (outside git) and the tasks were replayed in order. After each Step 1 the tests failed as this plan says, and after each Step 3 they passed with the counts in this plan. The final state had 80 unit tests and 53 Blender tests passing, the zip built, and the zip installed and loaded a file in a clean Blender profile.
+**How this plan was checked:** On 2026-10-15, every file in this plan was written in a scratch copy of the repository (outside git) and the tasks were replayed in order. After each Step 1 the tests failed as this plan says, and after each Step 3 they passed with the counts in this plan. The final state had 82 unit tests and 54 Blender tests passing, the zip built, and the zip installed and loaded a file in a clean Blender profile.
 
 ## Global Constraints
 
@@ -35,7 +35,7 @@ The spec leaves these points open. The plan decides them as follows. They do not
 3. A 3MF file with no G-code and no Bambu project data stops with: "This 3MF file has no G-code and is not a Bambu Studio project."
 4. Headless slicing writes to `slices/<project name>/` inside the spec's `slices/` folder.
 5. The toolpath object is named `<file name> Toolpaths`. Plugin objects go into a collection named `Slicer Animator`, with names that start with `SA `.
-6. The close-up camera uses the Hero angles (30° height, 35° side).
+6. The close-up camera uses the Hero angles (30° height, 35° side). Spec section 9 defines what it frames.
 7. Light power is 60, 25, and 50 × distance² W for key, fill, and rim (distance in m, 4 × part radius).
 
 ## File Structure
@@ -2746,9 +2746,9 @@ Compute the camera location and aim point for every frame of each preset (spec s
 - Produces:
   - `MARGIN = 1.15`, `START_AZIMUTH` (three-quarter view, −55°), `Bounds(center, radius)`, `CameraPath(location, target)`.
   - `part_bounds(position) -> Bounds`, `field_of_view(lens_mm, sensor_mm, width_px, height_px) -> (h, v)`, `framing_distance(radius, fov, margin=1.15) -> float`, `orbit_point(center, distance, azimuth, elevation)`.
-  - `turntable(bounds, distance, frames, *, turns=1.0, height_angle=25°, clockwise=False)`, `hero(bounds, distance, frames, *, height_angle=30°, side_angle=35°)`, `rising_follow(bounds, distance, head_z, *, height_angle=20°)`, `moving_average(points, window)`, `close_up(targets, *, distance=30.0, smoothing=15, height_angle=30°, side_angle=35°)`, `final_reveal(bounds, distance, frames, previous, *, spin=90°, pullback_share=0.4)`. All return `CameraPath` in mm.
+  - `turntable(bounds, distance, frames, *, turns=1.0, height_angle=25°, clockwise=False)`, `hero(bounds, distance, frames, *, height_angle=30°, side_angle=35°)`, `rising_follow(bounds, distance, head_z, *, height_angle=20°)`, `moving_average(points, window)`, `layer_bounds(position, layer_start) -> (centers (L,3), radii (L,))`, `close_up(targets, radii, fov, *, smoothing=15, height_angle=30°, side_angle=35°)`, `final_reveal(bounds, distance, frames, previous, *, spin=90°, pullback_share=0.4)`. All return `CameraPath` in mm.
 
-The spec gives no height or side angle for the close-up. This plan uses the Hero angles (30° and 35°).
+The close-up frames the full layer that is printing: it aims at the layer center and stays at the framing distance of the layer radius. The owner chose this on 2026-10-15 after test renders at 30 mm showed only a few strands. The spec gives no height or side angle for the close-up. This plan uses the Hero angles (30° and 35°).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2768,6 +2768,7 @@ from sliceranim.core.camera_paths import (
     final_reveal,
     framing_distance,
     hero,
+    layer_bounds,
     moving_average,
     part_bounds,
     rising_follow,
@@ -2830,11 +2831,27 @@ def test_moving_average_is_centered_and_shrinks_at_the_ends():
     np.testing.assert_allclose(moving_average(points, 3)[:, 0], [1.5, 3, 6, 7.5])
 
 
-def test_close_up_keeps_30_mm_from_the_smoothed_target():
+def test_layer_bounds_per_layer():
+    position = np.array([[0, 0, 0.2], [10, 20, 0.2], [2, 2, 0.4], [4, 2, 0.4]], dtype=np.float32)
+    centers, radii = layer_bounds(position, np.array([0, 2]))
+    np.testing.assert_allclose(centers, [[5, 10, 0.2], [3, 2, 0.4]])
+    np.testing.assert_allclose(radii, [math.hypot(10, 20) / 2, 1.0])  # a tiny layer gets at least 1 mm
+
+
+def test_close_up_frames_the_whole_layer():
+    targets = np.tile([5.0, 5.0, 0.2], (4, 1))
+    path = close_up(targets, np.full(4, 10.0), math.radians(60))
+    np.testing.assert_allclose(np.linalg.norm(path.location - path.target, axis=1), framing_distance(10.0, math.radians(60)))
+    np.testing.assert_allclose(path.target, targets)
+
+
+def test_close_up_smooths_jumps_between_layers():
     targets = np.array([[0, 0, 0], [10, 0, 0], [0, 0, 0], [10, 0, 0]], dtype=np.float64)
-    path = close_up(targets, smoothing=15)
-    np.testing.assert_allclose(np.linalg.norm(path.location - path.target, axis=1), 30.0)
+    radii = np.array([10.0, 30.0, 10.0, 30.0])
+    path = close_up(targets, radii, math.radians(60), smoothing=15)
     assert np.ptp(path.target[:, 0]) < 10.0
+    distance = np.linalg.norm(path.location - path.target, axis=1)
+    assert np.ptp(distance) < framing_distance(20.0, math.radians(60))
 
 
 def test_final_reveal_pulls_back_then_spins_90_degrees():
@@ -2966,12 +2983,27 @@ def moving_average(points: np.ndarray, window: int) -> np.ndarray:
     return (padded[high] - padded[low]) / (high - low)[:, None]
 
 
-def close_up(targets: np.ndarray, *, distance=30.0, smoothing=15, height_angle=math.radians(30), side_angle=math.radians(35)) -> CameraPath:
-    """Follow `targets` (the print head, or a fixed point repeated) at a short distance."""
+def layer_bounds(position: np.ndarray, layer_start: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Center (L, 3) and bounding sphere radius (L,) of each layer's bounding box. The radius is at least 1 mm."""
+    position = np.asarray(position, dtype=np.float64)
+    low = np.minimum.reduceat(position, layer_start, axis=0)
+    high = np.maximum.reduceat(position, layer_start, axis=0)
+    return (low + high) / 2, np.maximum(np.linalg.norm(high - low, axis=1) / 2, 1.0)
+
+
+def close_up(targets: np.ndarray, radii: np.ndarray, fov: float, *, smoothing=15, height_angle=math.radians(30), side_angle=math.radians(35)) -> CameraPath:
+    """Frame the full layer that is printing.
+
+    `targets` (mm) and `radii` (mm) are per frame: the center and radius of the current layer,
+    or a fixed point. The camera stays at the framing distance of the radius. Both values are
+    smoothed, so the camera does not jump when a new layer has another size.
+    """
     target = moving_average(targets, smoothing)
+    radius = moving_average(np.asarray(radii, dtype=np.float64)[:, None], smoothing)[:, 0]
     frames = len(target)
+    distance = radius / math.sin(fov / 2) * MARGIN
     azimuth = -math.pi / 2 + side_angle
-    location = orbit_point(target, np.full(frames, distance), np.full(frames, azimuth), np.full(frames, height_angle))
+    location = orbit_point(target, distance, np.full(frames, azimuth), np.full(frames, height_angle))
     return CameraPath(location, target)
 
 
@@ -3021,7 +3053,7 @@ def final_reveal(
 
 Run: `make test`
 
-Expected: `80 passed`. Without the sample or Bambu Studio, expect `79 passed, 1 skipped`.
+Expected: `82 passed`. Without the sample or Bambu Studio, expect `81 passed, 1 skipped`.
 
 - [ ] **Step 5: Commit**
 
@@ -3166,7 +3198,7 @@ def test_register_adds_the_scene_settings():
 def test_shot_items_have_the_spec_defaults():
     shot = settings().shots.add()
     assert (shot.duration, shot.style, shot.camera) == (4.0, "LINE", "TURNTABLE")
-    assert abs(shot.closeup_distance - 30.0) < 1e-6
+    assert shot.closeup_target == "LAYER" and not shot.closeup_dof
     assert shot.closeup_smoothing == 15
 ```
 
@@ -3284,7 +3316,7 @@ CAMERA_ITEMS = [
     ("TURNTABLE", "Turntable orbit", "Circle the part"),
     ("HERO", "Hero", "A fixed three-quarter view"),
     ("RISING", "Rising follow", "Move up with the current layer"),
-    ("CLOSE_UP", "Close-up", "Follow the print head from close by"),
+    ("CLOSE_UP", "Close-up", "Frame the full layer that is printing"),
     ("REVEAL", "Final reveal", "Pull back, then spin around the finished part"),
     ("CUSTOM", "My camera", "Use a camera that you placed"),
 ]
@@ -3345,12 +3377,12 @@ class SLICERANIM_PG_shot(bpy.types.PropertyGroup):
     rising_height: FloatProperty(name="Height angle", subtype="ANGLE", default=math.radians(20))
     closeup_target: EnumProperty(
         name="Target",
-        items=[("HEAD", "Print head", ""), ("CURSOR", "3D cursor", "The point under the 3D cursor when you click Rebuild")],
-        default="HEAD",
+        items=[("LAYER", "Current layer", "Aim at the center of the layer that is printing"),
+               ("CURSOR", "3D cursor", "Aim at the point under the 3D cursor when you click Rebuild")],
+        default="LAYER",
     )
-    closeup_distance: FloatProperty(name="Distance", description="Camera distance in mm", default=30.0, min=1.0)
     closeup_smoothing: IntProperty(name="Smoothing", description="Frames in the moving average", default=15, min=1)
-    closeup_dof: BoolProperty(name="Depth of field", default=True)
+    closeup_dof: BoolProperty(name="Depth of field", default=False)
     closeup_fstop: FloatProperty(name="F-stop", default=2.8, min=0.1)
     reveal_spin: FloatProperty(name="Spin amount", subtype="ANGLE", default=math.radians(90))
     reveal_pullback: FloatProperty(name="Pull-back share", subtype="PERCENTAGE", default=40.0, min=0.0, max=100.0)
@@ -4474,7 +4506,7 @@ Make one camera object per shot and key its location and rotation on the frames 
 - Consumes: `camera_paths` (Task 9), `plan_frames`, `Shot` (Task 8), `keys`, `looks.put_object`, `looks.remove_object`, `output.resolution` (Task 12), `importer.toolpath_from_object` (Task 11), `setup()` from `tests/blender/test_looks.py`.
 - Produces:
   - `cameras.TAG = "sliceranim_shot_camera"`, `cameras.LENS_MM = 50.0`, `cameras.SENSOR_MM = 36.0`.
-  - `cameras.remove_shot_cameras()`, `cameras.framing(scene) -> (Bounds, distance_mm)`, `cameras.path_for_shot(scene, shot, head, previous) -> CameraPath`, `cameras.eulers(location, target) -> np.ndarray`, `cameras.build(scene, plan) -> list[Object]`.
+  - `cameras.remove_shot_cameras()`, `cameras.smaller_fov(scene) -> float`, `cameras.framing(scene) -> (Bounds, distance_mm)`, `cameras.path_for_shot(scene, shot, head, layer, layer_info, previous) -> CameraPath`, `cameras.eulers(location, target) -> np.ndarray`, `cameras.build(scene, plan, tp) -> list[Object]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -4501,17 +4533,17 @@ def plan_for(s, rows):
         item.start_layer = start or 1
         item.duration, item.style, item.camera = duration, style, camera
     shots = [Shot(start, duration, style, camera) for start, duration, style, camera in rows]
-    return plan_frames(importer.toolpath_from_object(s.toolpath_object), shots, 10)
+    tp = importer.toolpath_from_object(s.toolpath_object)
+    return plan_frames(tp, shots, 10), tp
 
 
 def test_one_camera_per_shot_with_keys_on_its_own_frames():
     s = setup()
-    plan = plan_for(s, [(1, 1.0, "LINE", "CLOSE_UP"), (2, 1.0, "LAYER", "TURNTABLE"), (None, 1.0, "HOLD", "REVEAL")])
-    made = cameras.build(bpy.context.scene, plan)
+    plan, tp = plan_for(s, [(1, 1.0, "LINE", "CLOSE_UP"), (2, 1.0, "LAYER", "TURNTABLE"), (None, 1.0, "HOLD", "REVEAL")])
+    made = cameras.build(bpy.context.scene, plan, tp)
     assert [c.name for c in made] == ["SA Shot 1 Camera", "SA Shot 2 Camera", "SA Shot 3 Camera"]
     assert all(c.get(cameras.TAG) for c in made)
-    close_up = made[0]
-    assert close_up.data.dof.use_dof and abs(close_up.data.dof.focus_distance - 0.03) < 1e-9
+    assert not made[0].data.dof.use_dof  # depth of field is off by default
     bpy.context.scene.frame_set(15)
     orbit = made[1].matrix_world.translation
     center = np.array(s.part_center) * 0.001
@@ -4521,8 +4553,8 @@ def test_one_camera_per_shot_with_keys_on_its_own_frames():
 
 def test_cameras_look_at_their_target():
     s = setup()
-    plan = plan_for(s, [(1, 1.0, "LAYER", "HERO"), (None, 1.0, "HOLD", "REVEAL")])
-    made = cameras.build(bpy.context.scene, plan)
+    plan, tp = plan_for(s, [(1, 1.0, "LAYER", "HERO"), (None, 1.0, "HOLD", "REVEAL")])
+    made = cameras.build(bpy.context.scene, plan, tp)
     bpy.context.scene.frame_set(1)
     camera = made[0]
     forward = camera.matrix_world.to_quaternion() @ Vector((0, 0, -1))
@@ -4532,9 +4564,9 @@ def test_cameras_look_at_their_target():
 
 def test_rebuilding_cameras_removes_the_old_ones():
     s = setup()
-    plan = plan_for(s, [(1, 1.0, "LAYER", "HERO"), (None, 1.0, "HOLD", "REVEAL")])
-    cameras.build(bpy.context.scene, plan)
-    cameras.build(bpy.context.scene, plan)
+    plan, tp = plan_for(s, [(1, 1.0, "LAYER", "HERO"), (None, 1.0, "HOLD", "REVEAL")])
+    cameras.build(bpy.context.scene, plan, tp)
+    cameras.build(bpy.context.scene, plan, tp)
     assert len([o for o in bpy.data.objects if o.type == "CAMERA"]) == 2
 
 
@@ -4543,11 +4575,27 @@ def test_my_camera_is_used_as_is():
     data = bpy.data.cameras.new("Mine")
     mine = bpy.data.objects.new("Mine", data)
     bpy.context.scene.collection.objects.link(mine)
-    plan = plan_for(s, [(1, 1.0, "LAYER", "CUSTOM"), (None, 1.0, "HOLD", "REVEAL")])
+    plan, tp = plan_for(s, [(1, 1.0, "LAYER", "CUSTOM"), (None, 1.0, "HOLD", "REVEAL")])
     s.shots[0].custom_camera = mine
-    made = cameras.build(bpy.context.scene, plan)
+    made = cameras.build(bpy.context.scene, plan, tp)
     assert made[0] == mine
     assert mine.animation_data is None
+
+
+def test_close_up_aims_at_the_current_layer_and_frames_all_of_it():
+    s = setup()
+    plan, tp = plan_for(s, [(1, 1.0, "LINE", "CLOSE_UP"), (None, 1.0, "HOLD", "REVEAL")])
+    s.shots[0].closeup_dof = True
+    made = cameras.build(bpy.context.scene, plan, tp)
+    bpy.context.scene.frame_set(5)
+    camera = made[0]
+    layer_center = Vector((5.0, 5.0, 0.2)) * 0.001  # the fixture layers are 10 mm squares
+    forward = camera.matrix_world.to_quaternion() @ Vector((0, 0, -1))
+    to_center = layer_center - camera.matrix_world.translation
+    assert forward.angle(to_center) < math.radians(0.5)
+    expected = 0.001 * (math.hypot(9.55, 9.55) / 2) / math.sin(cameras.smaller_fov(bpy.context.scene) / 2) * 1.15
+    assert abs(to_center.length - expected) < 0.002
+    assert camera.data.dof.use_dof and abs(camera.data.dof.focus_distance - to_center.length) < 0.002
 ```
 
 - [ ] **Step 2: Run the tests and see them fail**
@@ -4583,17 +4631,25 @@ def remove_shot_cameras() -> None:
         looks.remove_object(obj.name)
 
 
+def smaller_fov(scene) -> float:
+    """The smaller of the horizontal and vertical field of view for the output size (radians)."""
+    width, height = resolution(scene.sliceranim)
+    return min(paths.field_of_view(LENS_MM, SENSOR_MM, width, height))
+
+
 def framing(scene) -> tuple[paths.Bounds, float]:
     """Part bounds (mm) and the framing distance (mm) for the output aspect ratio."""
     settings = scene.sliceranim
     bounds = paths.Bounds(center=np.array(settings.part_center, dtype=np.float64), radius=settings.part_radius)
-    width, height = resolution(settings)
-    horizontal, vertical = paths.field_of_view(LENS_MM, SENSOR_MM, width, height)
-    return bounds, paths.framing_distance(bounds.radius, min(horizontal, vertical))
+    return bounds, paths.framing_distance(bounds.radius, smaller_fov(scene))
 
 
-def path_for_shot(scene, shot, head: np.ndarray, previous) -> paths.CameraPath:
-    """Camera path of one shot. `head` is the print head (mm) for each frame of the shot."""
+def path_for_shot(scene, shot, head: np.ndarray, layer: np.ndarray, layer_info, previous) -> paths.CameraPath:
+    """Camera path of one shot.
+
+    `head` (mm) and `layer` (layer index) have one value per frame of the shot.
+    `layer_info` is (centers, radii) per layer from paths.layer_bounds().
+    """
     bounds, distance = framing(scene)
     count = len(head)
     if shot.camera == TURNTABLE:
@@ -4604,11 +4660,13 @@ def path_for_shot(scene, shot, head: np.ndarray, previous) -> paths.CameraPath:
     if shot.camera == RISING:
         return paths.rising_follow(bounds, shot.rising_distance or distance, head[:, 2], height_angle=shot.rising_height)
     if shot.camera == CLOSE_UP:
+        centers, radii = layer_info
+        index = layer.astype(np.int64)
         if shot.closeup_target == "CURSOR":
             targets = np.tile(np.array(scene.cursor.location) / MM, (count, 1))
         else:
-            targets = head
-        return paths.close_up(targets, distance=shot.closeup_distance, smoothing=shot.closeup_smoothing)
+            targets = centers[index]
+        return paths.close_up(targets, radii[index], smaller_fov(scene), smoothing=shot.closeup_smoothing)
     if shot.camera == REVEAL:
         return paths.final_reveal(bounds, distance, count, previous, spin=shot.reveal_spin,
                                   pullback_share=shot.reveal_pullback / 100.0)
@@ -4633,10 +4691,11 @@ def _custom_pose(scene, obj) -> tuple[np.ndarray, np.ndarray]:
     return location, location + forward * distance
 
 
-def build(scene, plan) -> list:
+def build(scene, plan, tp) -> list:
     """Make one camera per shot with keyframes for its frames. Return the camera objects in shot order."""
     remove_shot_cameras()
     settings = scene.sliceranim
+    layer_info = paths.layer_bounds(tp.position, tp.layer_start)
     result = []
     previous = None
     for row, shot in enumerate(settings.shots):
@@ -4646,8 +4705,8 @@ def build(scene, plan) -> list:
             result.append(shot.custom_camera)
             previous = _custom_pose(scene, shot.custom_camera)
             continue
-        head = plan.head[first - 1 : first - 1 + count]
-        path = path_for_shot(scene, shot, head, previous)
+        span = slice(first - 1, first - 1 + count)
+        path = path_for_shot(scene, shot, plan.head[span], plan.current_layer[span], layer_info, previous)
         data = bpy.data.cameras.new(f"SA Shot {row + 1}")
         data.lens = LENS_MM
         data.sensor_width = SENSOR_MM
@@ -4656,7 +4715,7 @@ def build(scene, plan) -> list:
         if shot.camera == CLOSE_UP and shot.closeup_dof:
             data.dof.use_dof = True
             data.dof.aperture_fstop = shot.closeup_fstop
-            data.dof.focus_distance = shot.closeup_distance * MM
+            data.dof.focus_distance = float(np.linalg.norm(path.location - path.target, axis=1).mean()) * MM
         obj = looks.put_object(scene, f"SA Shot {row + 1} Camera", data)
         obj[TAG] = True
         frames = np.arange(first, first + count)
@@ -4671,7 +4730,7 @@ def build(scene, plan) -> list:
 
 Run: `make test-blender`
 
-Expected: `21 passed, 0 failed, 0 skipped`.
+Expected: `22 passed, 0 failed, 0 skipped`.
 
 - [ ] **Step 5: Commit**
 
@@ -5074,7 +5133,7 @@ def rebuild(scene):
                np.where(is_line, keys.LINEAR, keys.CONSTANT))
     keys.write(obj, nodes.input_path(obj, "Current Layer"), frames, plan.current_layer, keys.CONSTANT)
     keys.write_vector(settings.head_object, "location", frames, plan.head * MM, keys.LINEAR)
-    shot_cameras = cameras.build(scene, plan)
+    shot_cameras = cameras.build(scene, plan, tp)
     for row, camera in enumerate(shot_cameras):
         marker = scene.timeline_markers.new(f"{MARKER_PREFIX}{row + 1}", frame=plan.shot_first_frame[row])
         marker.camera = camera
@@ -5327,7 +5386,7 @@ def build(context, loaded: Loaded, tp: ToolpathSet, *, keep_shots: bool) -> bpy.
 
 Run: `make test-blender`
 
-Expected: `39 passed, 0 failed, 0 skipped`.
+Expected: `40 passed, 0 failed, 0 skipped`.
 
 - [ ] **Step 5: Commit**
 
@@ -5526,7 +5585,7 @@ def unregister():
 
 Run: `make test-blender`
 
-Expected: `42 passed, 0 failed, 0 skipped`.
+Expected: `43 passed, 0 failed, 0 skipped`.
 
 - [ ] **Step 5: Commit**
 
@@ -5999,7 +6058,7 @@ class SLICERANIM_PT_shots(_Panel, bpy.types.Panel):
             "TURNTABLE": ("orbit_turns", "orbit_height", "orbit_clockwise"),
             "HERO": ("hero_height", "hero_side"),
             "RISING": ("rising_distance", "rising_height"),
-            "CLOSE_UP": ("closeup_target", "closeup_distance", "closeup_smoothing", "closeup_dof", "closeup_fstop"),
+            "CLOSE_UP": ("closeup_target", "closeup_smoothing", "closeup_dof", "closeup_fstop"),
             "REVEAL": ("reveal_spin", "reveal_pullback"),
             "CUSTOM": ("custom_camera",),
         }[shot.camera]
@@ -6093,7 +6152,7 @@ def unregister():
 
 Run: `make test-blender`
 
-Expected: `50 passed, 0 failed, 0 skipped`.
+Expected: `51 passed, 0 failed, 0 skipped`.
 
 - [ ] **Step 5: Commit**
 
@@ -6212,13 +6271,13 @@ def test_orcaslicer_gcode_reads():
 
 Run: `make test-blender`
 
-Expected: `53 passed, 0 failed, 0 skipped`. Without the sample or Bambu Studio, expect `50 passed, 0 failed, 3 skipped`. Read the printed lines. Open the three PNG frames in the printed folder and make sure that you see the part, the layer lines, and the orange highlight.
+Expected: `54 passed, 0 failed, 0 skipped`. Without the sample or Bambu Studio, expect `51 passed, 0 failed, 3 skipped`. Read the printed lines. Open the three PNG frames in the printed folder and make sure that you see the part, the layer lines, and the orange highlight. Frame 60 is the close-up: it must show the whole first layer.
 
 - [ ] **Step 3: Run the unit tests**
 
 Run: `make test`
 
-Expected: `80 passed, 1 skipped`. The skipped test waits for the OrcaSlicer file of spec 15.5 (owner check, item 9).
+Expected: `82 passed, 1 skipped`. The skipped test waits for the OrcaSlicer file of spec 15.5 (owner check, item 9).
 
 - [ ] **Step 4: Build the zip file**
 
@@ -6238,7 +6297,7 @@ Ask the owner to do these steps and to report each result:
 6. Drag `slices/sample/plate_1.gcode` (next to the saved .blend) onto the 3D view. Expected: it loads.
 7. In Output, keep 1920×1080, 30 fps, and MP4. Click Render. Expected: a 24-second MP4 in `renders/` next to the .blend after about 1 to 1.5 hours (spec section 16).
 8. Close Blender, open the .blend again, and look at frames 120, 400, and 700. Expected: the same frames as before.
-9. In OrcaSlicer, slice any part on one plate and export the G-code to `samples/orca_sample.gcode`. Then run `make test`. Expected: `81 passed`. If the OrcaSlicer test fails, use superpowers:systematic-debugging on the reader with the first 200 lines of that file. Do not commit the file.
+9. In OrcaSlicer, slice any part on one plate and export the G-code to `samples/orca_sample.gcode`. Then run `make test`. Expected: `83 passed`. If the OrcaSlicer test fails, use superpowers:systematic-debugging on the reader with the first 200 lines of that file. Do not commit the file.
 
 - [ ] **Step 6: Record the results**
 

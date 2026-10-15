@@ -306,11 +306,11 @@ Each shot gets its own camera object. Every preset frames the part from the boun
 | Turntable orbit | Circles the center of the part | Turns per shot (1), height angle (25°), direction (counterclockwise) |
 | Hero | Stays at a three-quarter view | Height angle (30°), side angle (35°) |
 | Rising follow | Moves up with the current layer height and aims at the print head height | Distance (framing distance), height angle (20°) |
-| Close-up | Follows the print head, or stays on a point that you pick with the 3D cursor | Target (print head), distance (30 mm), smoothing (15 frames), depth of field (on, f/2.8) |
+| Close-up | Frames the full layer that is printing. It aims at the center of that layer, or at a point that you pick with the 3D cursor, and stays at the framing distance of the layer. | Target (current layer), smoothing (15 frames), depth of field (off, f/2.8 when on) |
 | Final reveal | Pulls back from the framing of the previous shot in the first 40% of the shot. Spins around the finished part in the remaining 60%. As the first shot, it starts at the framing distance. | Spin amount (90°), pull-back share (40%) |
 | My camera | Uses a camera that you place. The plugin does not change it. | Camera object |
 
-Close-up smoothing is a moving average of the print head position over the given number of frames. It stops the camera from shaking when the nozzle changes direction.
+Close-up smoothing is a moving average of the layer center and the layer size over the given number of frames. It stops the camera from jumping when the next layer has another size.
 
 ## 10. Looks
 

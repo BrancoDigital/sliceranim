@@ -6,11 +6,11 @@ This file records each work session on Slicer Animator and the project status af
 
 | Item | Status |
 |---|---|
-| Phase | Planning. The spec is approved. The implementation plan waits for review. |
+| Phase | Planning done. The plan is filed and waits for execution in a new session. |
 | Spec | `docs/superpowers/specs/2026-10-15-slicer-animator-design.md` (approved 2026-10-15) |
-| Implementation plan | `docs/superpowers/plans/2026-10-15-slicer-animator.md` (17 tasks, waits for review) |
+| Implementation plan | `docs/superpowers/plans/2026-10-15-slicer-animator.md` (17 tasks, filed) |
 | Plugin code | Not started in the repository. The plan code was tested in a scratch copy only. |
-| Next step | The owner reviews the plan, decides the close-up f-stop, and picks how to run the plan. |
+| Next step | In a new session, pick subagent-driven or native execution and run the plan from Task 1. |
 
 ## Log
 
@@ -36,12 +36,16 @@ Findings from the plan work:
 
 1. The reader makes 378,247 points from the sample, and 306,701 after merging at 2°. Task 6 of the plan writes these numbers into the spec.
 2. The sample loads in 3.7 s on the M1 (criterion: less than 10 s).
-3. At f/2.8 and 30 mm, the close-up depth of field is about 0.06 mm, so the close-up shot renders as a blur.
+3. At f/2.8 and 30 mm, the close-up depth of field is about 0.06 mm, so the close-up shot rendered as a blur.
+
+Decisions after the plan:
+
+1. The close-up now frames the full layer that is printing, not a 30 mm macro of the nozzle. Depth of field is off by default. Spec section 9 and the plan are updated. The replay passed again: 82 unit tests and 54 Blender tests.
+2. The owner filed the plan for a new session.
 
 Open points:
 
-1. The owner decides the close-up f-stop (spec section 9).
-2. The owner reviews the plan and picks subagent-driven or native execution.
+1. Pick subagent-driven or native execution at the start of the next session.
 
 ### Session 1: 2026-10-15, workspace setup and design
 

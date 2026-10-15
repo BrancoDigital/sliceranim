@@ -6,7 +6,7 @@ from pathlib import Path
 import bpy
 from helpers import CUBE, box_object, settings
 
-from sliceranim.blender import importer, ui
+from sliceranim.blender import importer, shots, ui
 
 
 def run_load(path, **extra):
@@ -93,3 +93,36 @@ def test_shot_buttons_add_move_and_remove():
 
 def test_import_menu_entry_exists():
     assert ui.menu_import in bpy.types.TOPBAR_MT_file_import._dyn_ui_initialize()
+
+
+def load_box_with_50_layers():
+    box_object()
+    assert bpy.ops.sliceranim.use_selected() == {"FINISHED"}
+    assert settings().layer_count == 50 and len(settings().shots) == 4
+
+
+def test_add_shot_keeps_the_shot_list_valid():
+    """Owner check: Add Shot in the middle of the list made an End shot, and the rows after it went red."""
+    load_box_with_50_layers()
+    s = settings()
+    s.active_shot = 0
+    bpy.ops.sliceranim.shot_add()
+    new = s.shots[1]
+    assert (new.style, new.start_at_end, new.start_layer) == ("HOLD", False, 6)
+    assert not shots.problems(bpy.context.scene)
+    s.active_shot = len(s.shots) - 1
+    bpy.ops.sliceranim.shot_add()
+    assert s.shots[-1].start_at_end and s.shots[-1].style == "HOLD"
+    assert not shots.problems(bpy.context.scene)
+
+
+def test_end_makes_the_shot_a_hold_shot():
+    """Spec 8.3 rule 4: only Hold shots start at End. Checking End sets the style to Hold."""
+    load_box_with_50_layers()
+    s = settings()
+    s.shots[2].start_at_end = True
+    assert s.shots[2].style == "HOLD"
+    assert not shots.problems(bpy.context.scene)
+    s.shots[2].start_at_end = False
+    assert s.shots[2].start_layer == 46
+    assert not shots.problems(bpy.context.scene)

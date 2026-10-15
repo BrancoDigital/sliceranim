@@ -63,13 +63,19 @@ def _output(self, context):
     output.apply(context.scene)
 
 
+def _end_changed(self, context):
+    if self.start_at_end and self.style != "HOLD":
+        self.style = "HOLD"  # spec 8.3 rule 4: only Hold shots start at End
+
+
 def _is_camera(self, obj):
     return obj.type == "CAMERA"
 
 
 class SLICERANIM_PG_shot(bpy.types.PropertyGroup):
     start_layer: IntProperty(name="Start layer", min=1, default=1)
-    start_at_end: BoolProperty(name="End", description="Start after the last layer")
+    start_at_end: BoolProperty(name="End", description="Start after the last layer. The shot becomes a Hold shot",
+                               update=_end_changed)
     duration: FloatProperty(name="Duration", description="Screen time in seconds", min=0.0, default=4.0, step=50)
     style: EnumProperty(name="Build style", items=STYLE_ITEMS, default="LINE")
     camera: EnumProperty(name="Camera", items=CAMERA_ITEMS, default="TURNTABLE")

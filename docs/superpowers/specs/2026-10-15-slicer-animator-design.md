@@ -265,6 +265,8 @@ Each shot ends where the next shot starts. The last shot ends at End. The video 
 
 If a rule fails, the panel shows the bad row in red and turns off Rebuild.
 
+The panel helps you keep the list valid. When you check End on a shot, the shot becomes a Hold shot (rule 4). Add shot puts a Hold shot after the active shot, with the start of the next shot, or End when the active shot is the last one.
+
 ### 8.4 Default shot list
 
 The importer makes this shot list. For the sample (764 layers) the video is 24 seconds.

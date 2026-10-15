@@ -127,10 +127,14 @@ class SLICERANIM_OT_shot_add(bpy.types.Operator):
 
     def execute(self, context):
         settings = context.scene.sliceranim
-        item = settings.shots.add()
-        item.style = "HOLD"
-        item.start_at_end = True
-        item.start_layer = max(settings.layer_count, 1)
+        at_end, start = True, max(settings.layer_count, 1)
+        if settings.active_shot + 1 < len(settings.shots):
+            following = settings.shots[settings.active_shot + 1]
+            at_end, start = following.start_at_end, following.start_layer
+        item = settings.shots.add()  # this can move the items in memory, so read the next shot before it
+        item.style = "HOLD"  # a Hold shot can share the start of the next shot (spec 8.3), so the list stays valid
+        item.start_at_end = at_end
+        item.start_layer = start
         target = min(settings.active_shot + 1, len(settings.shots) - 1)
         settings.shots.move(len(settings.shots) - 1, target)
         settings.active_shot = target

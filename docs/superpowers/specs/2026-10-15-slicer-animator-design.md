@@ -1,7 +1,7 @@
 # Slicer Animator: design spec
 
 Date: 2026-10-15
-Status: draft for review
+Status: approved on 2026-10-15
 Target: Blender 5.2 LTS (tested on 5.2.2), macOS
 
 ## 1. Purpose
@@ -189,10 +189,14 @@ The fallback slicer takes a triangle mesh in millimeters. The input is a `.stl` 
 
 1. Cut the mesh with a horizontal plane at the middle of each layer. The default layer height is 0.2 mm.
 2. Join the cut segments into closed loops.
-3. Make one strand loop for each closed outline. The strand width is 0.45 mm.
-4. Give each point the feature `outer_wall` and a print time from a constant speed of 100 mm/s.
+3. Make two strand loops for each closed outline. The strand width (w) is 0.45 mm. Offset both loops toward the material side of the outline. This is inward for an outer outline and outward for a hole.
+   - The outer loop is offset by w / 2 (0.225 mm), so the part keeps its true size. Its feature is `outer_wall`.
+   - The inner loop is offset by 1.5 × w (0.675 mm). Its feature is `inner_wall`.
+4. If the inner loop crosses itself or its area falls to 0 or below, drop that inner loop. This happens on features thinner than about 3 strand widths (1.35 mm).
+5. In each layer, print the inner loops first and the outer loops after, as Bambu Studio does by default.
+6. Give each point a print time from a constant speed of 100 mm/s.
 
-The fallback output has no infill and no inner walls. The panel shows this when the fallback is in use.
+The offset uses numpy only (section 13). The fallback output has no infill. The panel shows this when the fallback is in use.
 
 ## 7. Toolpath object
 

@@ -1,0 +1,20 @@
+schema_version = "1.0.0"
+
+id = "sliceranim"
+version = "0.1.0"
+name = "Slicer Animator"
+tagline = "Animate a 3D print growing layer by layer from real G-code"
+maintainer = "Luis Branco <luis@brancooo.com>"
+type = "add-on"
+
+blender_version_min = "5.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 Luis Branco"]
+tags = ["Animation", "Import-Export"]
+
+[permissions]
+files = "Read print files and write sliced files and renders"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc"]

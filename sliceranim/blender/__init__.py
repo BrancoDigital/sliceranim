@@ -2,9 +2,9 @@
 
 import bpy
 
-from . import prefs, props
+from . import prefs, preview, props
 
-CLASSES = (prefs.SLICERANIM_AP_preferences,)
+CLASSES = (prefs.SLICERANIM_AP_preferences, *preview.CLASSES)
 
 
 def register():

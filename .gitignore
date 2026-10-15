@@ -1,0 +1,16 @@
+# Client models and sliced files. Do not commit.
+samples/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Blender backups
+*.blend1
+*.blend2
+
+# Rendered videos
+renders/

@@ -6,11 +6,11 @@ This file records each work session on Slicer Animator and the project status af
 
 | Item | Status |
 |---|---|
-| Phase | Design. Review round 1 is applied. The spec waits for 2 decisions and for approval. |
-| Spec | `docs/superpowers/specs/2026-10-15-slicer-animator-design.md` (draft) |
-| Implementation plan | Not started |
-| Plugin code | Not started |
-| Next step | The owner decides the fallback slicer walls (1 or 2 loops) and the defaults in sections 8.4, 9, and 10. Then the owner approves the spec, and Claude writes the implementation plan. |
+| Phase | Planning. The spec is approved. The implementation plan waits for review. |
+| Spec | `docs/superpowers/specs/2026-10-15-slicer-animator-design.md` (approved 2026-10-15) |
+| Implementation plan | `docs/superpowers/plans/2026-10-15-slicer-animator.md` (17 tasks, waits for review) |
+| Plugin code | Not started in the repository. The plan code was tested in a scratch copy only. |
+| Next step | The owner reviews the plan, decides the close-up f-stop, and picks how to run the plan. |
 
 ## Log
 
@@ -29,11 +29,19 @@ Done:
 7. Added 2 features on request from the owner: Preview (play the video in the 3D view) and Ghost (a transparent shell of the unprinted part).
 8. Added `*.blend` and `slices/` to `.gitignore`, because they can hold client parts.
 
+9. The owner chose 2 wall loops for the fallback slicer, approved all defaults, and approved the spec (commit `21bfb65`).
+10. Wrote the implementation plan with the superpowers:writing-plans skill. Every task was replayed in a scratch copy outside git: 80 unit tests and 53 Blender tests passed, and the built zip installed in a clean Blender profile.
+
+Findings from the plan work:
+
+1. The reader makes 378,247 points from the sample, and 306,701 after merging at 2°. Task 6 of the plan writes these numbers into the spec.
+2. The sample loads in 3.7 s on the M1 (criterion: less than 10 s).
+3. At f/2.8 and 30 mm, the close-up depth of field is about 0.06 mm, so the close-up shot renders as a blur.
+
 Open points:
 
-1. Fallback slicer: 1 wall loop (spec) or 2 loops (agreed in session 1).
-2. The owner must confirm or change the defaults in sections 8.4, 9, and 10, plus the new defaults for Ghost, Viewport strand sides, and Final reveal.
-3. The point counts in sections 6.3 and 16 differ. The first reader test measures them again.
+1. The owner decides the close-up f-stop (spec section 9).
+2. The owner reviews the plan and picks subagent-driven or native execution.
 
 ### Session 1: 2026-10-15, workspace setup and design
 

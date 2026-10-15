@@ -5,6 +5,8 @@ Units are millimeters and seconds. All indices count from 0.
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -203,3 +205,86 @@ class ToolpathBuilder:
             layer_z_by_number=self._layer_z,
             meta=meta,
         )
+
+
+def subset(tp: ToolpathSet, keep: np.ndarray) -> ToolpathSet:
+    """Keep the points where `keep` is True. Run and layer starts must be kept."""
+    if not (np.all(keep[tp.run_start]) and np.all(keep[tp.layer_start])):
+        raise ValueError("subset must keep the first point of every run and layer")
+    new_index = np.cumsum(keep) - 1
+    return ToolpathSet(
+        position=tp.position[keep],
+        layer=tp.layer[keep],
+        feature=tp.feature[keep],
+        tool=tp.tool[keep],
+        width=tp.width[keep],
+        height=tp.height[keep],
+        time=tp.time[keep],
+        object_id=tp.object_id[keep],
+        run_start=new_index[tp.run_start].astype(np.int32),
+        layer_start=new_index[tp.layer_start].astype(np.int32),
+        layer_z=tp.layer_z.copy(),
+        meta=dict(tp.meta),
+    )
+
+
+def merge_points(tp: ToolpathSet, angle_deg: float) -> ToolpathSet:
+    """Remove a point when the path turns by less than angle_deg there (spec section 7).
+
+    The first and last point of each run stay. A point also stays when the width
+    or the height changes there. Each kept point keeps its own print time, so the
+    total print time does not change. The angle is measured from the last kept
+    point, so a gentle curve does not turn into one straight line.
+    """
+    result_meta = dict(tp.meta, merge_angle=angle_deg)
+    if angle_deg <= 0 or tp.point_count == 0:
+        out = subset(tp, np.ones(tp.point_count, dtype=bool))
+        out.meta = result_meta
+        return out
+    cos_limit = math.cos(math.radians(angle_deg))
+    pos = tp.position.astype(np.float64).tolist()
+    width = tp.width.tolist()
+    height = tp.height.tolist()
+    keep = np.ones(tp.point_count, dtype=bool)
+    starts = tp.run_start.tolist()
+    ends = [s - 1 for s in starts[1:]] + [tp.point_count - 1]
+    for start, end in zip(starts, ends):
+        anchor = start
+        for i in range(start + 1, end):
+            if width[i] != width[anchor] or height[i] != height[anchor] or width[i] != width[i + 1] or height[i] != height[i + 1]:
+                anchor = i
+                continue
+            ax, ay, az = pos[anchor]
+            px, py, pz = pos[i]
+            nx, ny, nz = pos[i + 1]
+            ux, uy, uz = px - ax, py - ay, pz - az
+            vx, vy, vz = nx - px, ny - py, nz - pz
+            lu = math.sqrt(ux * ux + uy * uy + uz * uz)
+            lv = math.sqrt(vx * vx + vy * vy + vz * vz)
+            if lu == 0.0:
+                keep[i] = False
+                continue
+            if lv == 0.0:
+                anchor = i
+                continue
+            if (ux * vx + uy * vy + uz * vz) / (lu * lv) > cos_limit:
+                keep[i] = False
+            else:
+                anchor = i
+    out = subset(tp, keep)
+    out.meta = result_meta
+    return out
+
+
+def shell_point_count(tp: ToolpathSet) -> int:
+    """Number of points that the ghost can draw: outer walls, overhang walls, top surfaces."""
+    codes = [FEATURE_CODE["outer_wall"], FEATURE_CODE["overhang_wall"], FEATURE_CODE["top_surface"]]
+    return int(np.isin(tp.feature, codes).sum())
+
+
+def estimate_polygons(tp: ToolpathSet, strand_sides: int, ghost: bool) -> int:
+    """Estimate from spec section 7: points x strand sides, plus ghost points x 4."""
+    estimate = tp.point_count * strand_sides
+    if ghost:
+        estimate += shell_point_count(tp) * 4
+    return estimate

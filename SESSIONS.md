@@ -6,13 +6,34 @@ This file records each work session on Slicer Animator and the project status af
 
 | Item | Status |
 |---|---|
-| Phase | Design. The spec waits for review. |
+| Phase | Design. Review round 1 is applied. The spec waits for 2 decisions and for approval. |
 | Spec | `docs/superpowers/specs/2026-10-15-slicer-animator-design.md` (draft) |
 | Implementation plan | Not started |
 | Plugin code | Not started |
-| Next step | Review the spec in a new session. After approval, write the implementation plan. |
+| Next step | The owner decides the fallback slicer walls (1 or 2 loops) and the defaults in sections 8.4, 9, and 10. Then the owner approves the spec, and Claude writes the implementation plan. |
 
 ## Log
+
+### Session 2: 2026-10-15, spec review
+
+Goal: review the design spec before the implementation plan.
+
+Done:
+
+1. Reviewed the spec and found 5 problems. The owner approved all 5 fixes.
+2. Fixed the shot end rule. Start layer N is the moment before layer N prints. Each shot ends where the next one starts.
+3. Made all stored indices count from 0. The panel shows layers from 1. Fixed the Geometry Nodes rule for the growing strand.
+4. Added a 2-shot default list for prints with fewer than 20 layers.
+5. Merging runs at import. A Reload button reads the source again. Added an error for a missing source file.
+6. Added camera keyframes and nozzle visibility to the Rebuild list. Defined how Final reveal splits its time.
+7. Added 2 features on request from the owner: Preview (play the video in the 3D view) and Ghost (a transparent shell of the unprinted part).
+8. Added `*.blend` and `slices/` to `.gitignore`, because they can hold client parts.
+
+Open points:
+
+1. Fallback slicer: 1 wall loop (spec) or 2 loops (agreed in session 1).
+2. The owner must confirm or change the defaults in sections 8.4, 9, and 10, plus the new defaults for Ghost, Viewport strand sides, and Final reveal.
+3. The point counts in sections 6.3 and 16 differ. The first reader test measures them again.
 
 ### Session 1: 2026-10-15, workspace setup and design
 

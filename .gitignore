@@ -8,9 +8,11 @@ samples/
 __pycache__/
 *.pyc
 
-# Blender backups
+# Blender files and headless slice output. They can hold client parts.
+*.blend
 *.blend1
 *.blend2
+slices/
 
 # Rendered videos
 renders/

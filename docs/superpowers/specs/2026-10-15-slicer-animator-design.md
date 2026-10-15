@@ -18,6 +18,7 @@ The users are the owner and a small group of people that the owner sends the ext
 2. With the default shot list, Rebuild and Render produce a 24-second 1920×1080 MP4 without manual steps in Blender.
 3. The video shows walls, infill, and top surfaces from the real G-code, with real layer lines.
 4. All plugin settings are saved in the `.blend` file. When you open the file again, you get the same video.
+5. Preview plays the video in the 3D view without a render and without manual changes to the view.
 
 ## 2. Scope
 
@@ -30,7 +31,9 @@ The users are the owner and a small group of people that the owner sends the ext
 5. A shot list that controls build style, timing, and camera for each part of the video.
 6. Six camera presets: turntable orbit, hero, rising follow, close-up, final reveal, and your own camera.
 7. A filament material with finish presets, an active-layer highlight, a studio backdrop, an optional plate mat, and an optional nozzle tip.
-8. Output presets for 16:9 1080p, 1:1, 16:9 4K, and a custom size.
+8. An optional ghost: a transparent shell of the part that is not printed yet. The build fills it up.
+9. A preview that plays the video in the 3D view.
+10. Output presets for 16:9 1080p, 1:1, 16:9 4K, and a custom size.
 
 ### Not in version 1 (the later list)
 
@@ -54,6 +57,7 @@ The users are the owner and a small group of people that the owner sends the ext
 | Feature | The toolpath type that the slicer gives a move, for example outer wall or sparse infill. |
 | ToolpathSet | The internal data format. Every input becomes a ToolpathSet. |
 | Progress | One animated number. It is the count of strand points that are already printed. |
+| Ghost | A transparent shell that shows the part of the print that is not printed yet. |
 | Print head | An invisible Blender empty that moves with the current nozzle position. |
 | Shot | One part of the video with its own start layer, duration, build style, and camera. |
 | Fallback slicer | Code in the plugin that cuts a mesh into layer outlines when no G-code exists. |
@@ -74,7 +78,7 @@ The plugin has seven parts. The parts in `core/` do not import `bpy`, so they ru
 | Toolpath object | `blender/` | Build one mesh with point attributes, plus the Geometry Nodes setup that draws strands. |
 | Cameras | `blender/` | Make one camera for each shot and frame the part. |
 | Looks | `blender/` | Make the materials, the backdrop, the lights, the plate mat, and the nozzle tip. |
-| Panel and output | `blender/` | Show the sidebar panel, the import menu, drag and drop, and the render settings. |
+| Panel and output | `blender/` | Show the sidebar panel, the import menu, drag and drop, the preview, and the render settings. |
 
 ## 5. ToolpathSet
 
@@ -95,6 +99,8 @@ A ToolpathSet holds all extruded points of one print in print order. Units are m
 | `layer_z` | float32, L | Height of each layer |
 
 Point index is the print order. The first point of a run has no strand before it.
+
+All indices in the ToolpathSet and in the Blender object count from 0. This includes point index, `layer`, and Current Layer. The panel shows layer numbers that count from 1. Layer number N in the panel is layer index N − 1.
 
 The ToolpathSet also holds metadata: source slicer and version, file path, layer count, total print time, filament colors, and filament type.
 
@@ -175,7 +181,7 @@ On macOS, `<BambuStudio>` is `/Applications/BambuStudio.app/Contents/MacOS/Bambu
 
 The output directory is `<blend directory>/slices/` when the `.blend` file is saved. Otherwise it is a temporary directory. After the run, the plugin reads `result.json` from the output directory. If `return_code` is not 0, the plugin shows `error_string` from that file. If the run succeeds, the plugin reads `plate_1.gcode`.
 
-Tested on 2026-10-15 with Bambu Studio 2.08.02.61: `samples/sample.3mf` sliced in 2.4 seconds to 764 layers, 4 h 11 min of print time, and 386k strand points.
+Tested on 2026-10-15 with Bambu Studio 2.08.02.61: `samples/sample.3mf` sliced in 2.4 seconds to 764 layers, 4 h 11 min of print time, and 386k strand points. The arc and merge settings of this count were not recorded. Section 16 gives a different count for the same part. The first G-code reader test measures the count again with the rules of sections 6.1 and 7, and corrects both numbers.
 
 ### 6.4 Fallback slicer
 
@@ -194,26 +200,32 @@ The importer builds one mesh object named after the source file:
 
 1. One vertex for each ToolpathSet point, in meters.
 2. One edge between two neighbor points of the same run.
-3. Point attributes: `order`, `layer`, `feature`, `tool`, `width`, `height`.
+3. Point attributes: `order` (the point index, from 0), `layer`, `feature`, `tool`, `width`, `height`.
 
-A Geometry Nodes modifier draws the strands. It has three inputs: Progress (float), Current Layer (float), and Strand Sides (integer).
+A Geometry Nodes modifier draws the strands. It has these inputs: Progress (float), Current Layer (float), Strand Sides (integer), Viewport Strand Sides (integer), and Ghost (boolean).
 
-1. Delete each point with `order` greater than `floor(Progress) + 1`.
-2. Move point `floor(Progress) + 1` to the position between its previous point and itself, at the fraction `Progress - floor(Progress)`. This step makes the newest strand grow smoothly. It applies only when both points are in the same run.
+1. Delete each point with `order` greater than `floor(Progress)`.
+2. Move point `floor(Progress)` to the position between its previous point and itself, at the fraction `Progress - floor(Progress)`. This step makes the newest strand grow smoothly. It applies only when both points are in the same run.
 3. Convert the mesh edges to curves.
 4. Set the curve normal mode to Z Up, so that the strand profile stays flat.
-5. Sweep an oval profile along each curve. The profile is a circle with Strand Sides points, scaled to height/width in its Y axis. The `width / 2` attribute goes into the Scale input of Curve to Mesh.
+5. Sweep an oval profile along each curve. The profile is a circle with Strand Sides points, scaled to height/width in its Y axis. The `width / 2` attribute goes into the Scale input of Curve to Mesh. In the 3D view, the profile uses Viewport Strand Sides instead (Is Viewport node). Renders always use Strand Sides.
 6. Store a `heat` attribute: `clamp(1 - (Current Layer - layer) / highlight_layers, 0, 1)`. The material reads it.
 7. Set smooth shading and the filament material.
+8. If Ghost is on, draw the ghost from the points that are not printed yet (`order` greater than `floor(Progress)`). The ghost uses only the features `outer_wall`, `overhang_wall`, and `top_surface`, so it looks like a clear shell of the part. It uses Viewport Strand Sides in the 3D view and 4 sides in renders, and the ghost material from section 10.
+
+The ghost leaves out inner walls and infill for two reasons. Many stacked transparent layers look like noise, and the shell adds fewer polygons.
 
 ### Strand detail
 
 | Setting | Default | Effect |
 |---|---|---|
-| Strand sides | 6 | 4, 6, or 8 sides per strand |
-| Merge angle | 2° | Remove a point when the direction changes by less than this angle. The time of the removed point goes to the next point. 0 turns merging off. |
+| Strand sides | 6 | 4, 6, or 8 sides per strand in renders |
+| Viewport strand sides | 4 | 3, 4, 6, or 8 sides per strand in the 3D view. Fewer sides make the preview faster. |
+| Merge angle | 2° | Remove a point when the direction changes by less than this angle. 0 turns merging off. |
 
-If the estimated polygon count (points × strand sides) is more than 10 million, the plugin shows the warning in section 12 before it builds the object.
+Merging runs in `core/` at import, before timing. Progress counts the points after merging. The next point keeps its own print time, so the total print time does not change. If you change Merge angle after import, the Source section shows a Reload button. Reload reads the source file again and builds the object again. If the source file is not there, Reload shows the error in section 12. This can happen after a restart when the headless slice went to a temporary directory.
+
+If the estimated polygon count is more than 10 million, the plugin shows the warning in section 12 before it builds the object. The estimate is points × strand sides, plus ghost points × 4 when Ghost is on.
 
 ## 8. Timing and the shot list
 
@@ -221,13 +233,15 @@ If the estimated polygon count (points × strand sides) is more than 10 million,
 
 | Field | Values | Meaning |
 |---|---|---|
-| Start layer | 1 to L, or End | The shot starts at this layer. End means after the last layer. |
+| Start layer | 1 to L, or End | The point in the print where the shot starts |
 | Duration | Seconds, more than 0 | Screen time of the shot |
 | Build style | Line, Layer, Hold | How the build moves in this shot |
 | Camera | One of the six camera presets | Camera of the shot |
 | Camera settings | Depends on the preset | See section 9 |
 
-A shot ends where the next shot starts. The last Line or Layer shot ends at the last layer. The video length is the sum of all durations.
+L is the layer count. Start layer N is the moment before the first point of layer N prints. End is the moment after the last point prints.
+
+Each shot ends where the next shot starts. The last shot ends at End. The video length is the sum of all durations.
 
 ### 8.2 Build styles
 
@@ -235,7 +249,7 @@ A shot ends where the next shot starts. The last Line or Layer shot ends at the 
 |---|---|
 | Line | Frames map linearly to print time between the start and the end of the shot. Each frame gets the point index at that print time, with a fraction for the partial strand. |
 | Layer | The layers of the shot divide evenly over the frames. Each frame shows complete layers only. |
-| Hold | The build does not move. It stays at the state of the shot start layer. |
+| Hold | The build does not move. It stays at the start point of the shot. |
 
 ### 8.3 Rules for a valid shot list
 
@@ -258,15 +272,24 @@ The importer makes this shot list. For the sample (764 layers) the video is 24 s
 | 3 | L − 4 | 4 s | Line | Rising follow |
 | 4 | End | 4 s | Hold | Final reveal |
 
+If L is less than 20, shot 3 does not fit after shot 2. The importer then makes this shot list:
+
+| # | Start layer | Duration | Build style | Camera |
+|---|---|---|---|---|
+| 1 | 1 | 20 s | Line | Turntable orbit |
+| 2 | End | 4 s | Hold | Final reveal |
+
 ### 8.5 What Rebuild writes
 
 The timing code computes one value for each frame. Rebuild then writes these values to Blender:
 
 1. A keyframe on Progress for each frame. Line shots use linear interpolation. Layer and Hold shots use constant interpolation.
-2. A keyframe on Current Layer for each frame.
+2. A keyframe on Current Layer for each frame. The value is the layer index of the newest strand point.
 3. A keyframe on the print head location for each frame. The location is the position of the newest strand point.
 4. One timeline marker for each shot, bound to the camera of the shot.
 5. The scene start frame (1) and end frame.
+6. The camera keyframes of each shot, from the presets in section 9.
+7. Keyframes on the visibility of the nozzle tip, with constant interpolation. The tip is visible in Line shots and hidden in the other shots.
 
 Rebuild deletes the markers and keyframes that it wrote before. Before it does this, it warns you that manual changes to these markers will be lost.
 
@@ -280,7 +303,7 @@ Each shot gets its own camera object. Every preset frames the part from the boun
 | Hero | Stays at a three-quarter view | Height angle (30°), side angle (35°) |
 | Rising follow | Moves up with the current layer height and aims at the print head height | Distance (framing distance), height angle (20°) |
 | Close-up | Follows the print head, or stays on a point that you pick with the 3D cursor | Target (print head), distance (30 mm), smoothing (15 frames), depth of field (on, f/2.8) |
-| Final reveal | Pulls back from the framing of the previous shot, then spins around the finished part | Spin amount (90°) |
+| Final reveal | Pulls back from the framing of the previous shot in the first 40% of the shot. Spins around the finished part in the remaining 60%. As the first shot, it starts at the framing distance. | Spin amount (90°), pull-back share (40%) |
 | My camera | Uses a camera that you place. The plugin does not change it. | Camera object |
 
 Close-up smoothing is a moving average of the print head position over the given number of frames. It stops the camera from shaking when the nozzle changes direction.
@@ -296,6 +319,7 @@ Close-up smoothing is a moving average of the print head position over the given
 | Lights | Key, fill, and rim area lights, scaled to the size of the part | On |
 | Plate mat | A 256 mm × 256 mm plane at z = 0 with a procedural textured PEI material. No image files. | Off |
 | Nozzle tip | A brass cone, 6 mm high, parented to the print head. Visible only in Line shots. | Off |
+| Ghost | A transparent material on the ghost shell (section 7, step 8). Eevee uses the Dithered render method. You set the color and the opacity. | Off, filament color, 15% opacity |
 
 ## 11. Output and panel
 
@@ -324,12 +348,26 @@ All of these use the same load operator:
 
 The panel is a tab named "Slicer Anim" in the sidebar of the 3D view. It has four sections, in the order that you use them:
 
-1. Source: the load buttons from 11.2, and a summary of slicer, layer count, print time, and point count.
-2. Look: color, finish, highlight, strand detail, backdrop, plate mat, nozzle tip.
+1. Source: the load buttons from 11.2, Reload (section 7), and a summary of slicer, layer count, print time, and point count.
+2. Look: color, finish, highlight, ghost, strand detail, backdrop, plate mat, nozzle tip.
 3. Shots: the shot list, with buttons to add, remove, and move shots.
-4. Output: the settings from 11.1, plus Rebuild and Render.
+4. Output: the settings from 11.1, plus Rebuild, Preview, and Render.
 
 The plugin stores its settings in a property group on the scene. The Bambu Studio path is an add-on preference.
+
+### 11.4 Preview
+
+Preview plays the video in the 3D view. It does not render, and you do not change view settings by hand. When you click Preview, the plugin does these steps:
+
+1. If the shot list or the timing changed since the last Rebuild, run Rebuild.
+2. Set the 3D view to look through the scene camera. The timeline markers switch the camera at each shot, as in the render.
+3. Set the shading of the 3D view to Material Preview, with the scene lights and the scene world on. The preview then shows the filament material, the highlight, the ghost, and the backdrop.
+4. Set playback to drop frames when the 3D view is slow, so the video plays at its real speed.
+5. Start playback at frame 1.
+
+The Preview button then changes to Exit Preview. Exit Preview stops playback and restores the view, the shading, and the playback setting that you had before.
+
+The frame rate of the preview on the reference machine is not measured yet. The first Blender test measures it.
 
 ## 12. Errors
 
@@ -343,6 +381,7 @@ The plugin stores its settings in a property group on the scene. The Bambu Studi
 | More than 10 million estimated polygons | This print makes about N million polygons. Lower Strand sides or raise Merge angle to make it faster. |
 | Shot list rule fails | The row turns red and shows the rule that failed. |
 | Fallback slicer on a mesh with open edges | The mesh has holes, so some layers can be incomplete. |
+| Reload when the source file is gone | Source file not found: `<path>`. Open the file again. |
 
 ## 13. Packaging
 
@@ -372,6 +411,7 @@ sliceranim/                  the extension
     cameras.py
     looks.py
     ui.py                    panel, menu entry, drag and drop
+    preview.py               Preview and Exit Preview in the 3D view
     props.py                 scene property group
     prefs.py                 add-on preferences
 tests/
@@ -384,7 +424,7 @@ samples/                     client files, ignored by git
 
 ## 15. Testing
 
-1. Unit tests run with pytest (a Python test runner) in a local virtual environment with numpy. They cover the G-code reader, arcs, feature mapping, 3MF detection, plate count, the fallback slicer, and timing.
+1. Unit tests run with pytest (a Python test runner) in a local virtual environment with numpy. They cover the G-code reader, arcs, feature mapping, merging, 3MF detection, plate count, the fallback slicer, timing, and the default shot list for short prints.
 2. Test fixtures are small G-code files made by hand. Client files are never committed.
 3. Blender tests run with `Blender -b --factory-startup --python-exit-code 1 -P <test>`. They build the toolpath object, run Rebuild, and compare evaluated polygon counts with expected values.
 4. The render smoke test renders three frames of `samples/sample.3mf` at 480×270. If the file is not present, the test is skipped.
@@ -396,7 +436,7 @@ A throwaway probe ran on 2026-10-15 on an Apple M1 with 8 GB of memory, Blender 
 
 | Step | Result |
 |---|---|
-| Read G-code | 0.55 s for 313k points |
+| Read G-code | 0.55 s for 313k points (arc and merge settings not recorded, see section 6.3) |
 | Build mesh with attributes | 0.18 s |
 | Complete print as strands (6 sides) | 1.9 million polygons |
 | Eevee render at 960×960, after shader compile | 3.4 s per frame |

@@ -44,3 +44,40 @@ def evaluated_bounds(obj) -> tuple[np.ndarray, np.ndarray]:
         evaluated.to_mesh_clear()
     co = co.reshape(-1, 3)
     return co.min(axis=0), co.max(axis=0)
+
+
+def load(path) -> None:
+    """Load a file the way the Open File button does, without the polygon warning."""
+    from sliceranim.blender import importer
+
+    loaded = importer.read_file(bpy.context, str(path))
+    importer.build(bpy.context, loaded, importer.prepare(bpy.context, loaded), keep_shots=False)
+
+
+def polygons_at(frame: int) -> int:
+    bpy.context.scene.frame_set(frame)
+    return evaluated_polygons(settings().toolpath_object)
+
+
+def keyframes(id_data, data_path: str, index: int = 0) -> np.ndarray:
+    """(frame, value) pairs of one channel."""
+    from bpy_extras import anim_utils
+
+    data = id_data.animation_data
+    curve = anim_utils.action_get_channelbag_for_slot(data.action, data.action_slot).fcurves.find(data_path, index=index)
+    co = np.empty(len(curve.keyframe_points) * 2, dtype=np.float32)
+    curve.keyframe_points.foreach_get("co", co)
+    return co.reshape(-1, 2)
+
+
+def box_object(name: str = "Box", size: float = 0.01):
+    """A closed box mesh object of `size` meters on z = 0. It becomes the active object."""
+    s = size
+    verts = [(0, 0, 0), (s, 0, 0), (s, s, 0), (0, s, 0), (0, 0, s), (s, 0, s), (s, s, s), (0, s, s)]
+    faces = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    return obj

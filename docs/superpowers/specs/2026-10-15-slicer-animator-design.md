@@ -181,7 +181,7 @@ On macOS, `<BambuStudio>` is `/Applications/BambuStudio.app/Contents/MacOS/Bambu
 
 The output directory is `<blend directory>/slices/` when the `.blend` file is saved. Otherwise it is a temporary directory. After the run, the plugin reads `result.json` from the output directory. If `return_code` is not 0, the plugin shows `error_string` from that file. If the run succeeds, the plugin reads `plate_1.gcode`.
 
-Tested on 2026-10-15 with Bambu Studio 2.08.02.61: `samples/sample.3mf` sliced in 2.4 seconds to 764 layers, 4 h 11 min of print time, and 386k strand points. The arc and merge settings of this count were not recorded. Section 16 gives a different count for the same part. The first G-code reader test measures the count again with the rules of sections 6.1 and 7, and corrects both numbers.
+Tested on 2026-10-15 with Bambu Studio 2.08.02.61: `samples/sample.3mf` sliced in 2.4 seconds to 764 layers and 4 h 11 min of print time. The G-code reader makes 378,247 strand points from it, with arcs split at 0.5 mm. Merging at 2° leaves 306,701 points.
 
 ### 6.4 Fallback slicer
 
@@ -440,7 +440,8 @@ A throwaway probe ran on 2026-10-15 on an Apple M1 with 8 GB of memory, Blender 
 
 | Step | Result |
 |---|---|
-| Read G-code | 0.55 s for 313k points (arc and merge settings not recorded, see section 6.3) |
+| Read G-code | 0.55 s for 313k points (throwaway probe reader) |
+| Read G-code with the plugin reader | 1.1 s for 378,247 points. Merging at 2° takes 0.2 s and leaves 306,701 points. |
 | Build mesh with attributes | 0.18 s |
 | Complete print as strands (6 sides) | 1.9 million polygons |
 | Eevee render at 960×960, after shader compile | 3.4 s per frame |

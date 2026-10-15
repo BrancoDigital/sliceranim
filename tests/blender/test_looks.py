@@ -114,3 +114,35 @@ def test_keys_write_replaces_old_keys():
     assert obj.location.x == 4.0
     keys.remove(obj, {"location"})
     assert obj.animation_data.action is not None
+
+
+def test_output_folder_is_made_next_to_a_saved_file():
+    """Owner check: the panel showed //renders/ in red because the folder did not exist yet."""
+    import tempfile
+    from pathlib import Path
+
+    from helpers import CUBE, load
+
+    folder = Path(tempfile.mkdtemp(prefix="sliceranim_saved_"))
+    bpy.ops.wm.save_as_mainfile(filepath=str(folder / "test.blend"))
+    load(CUBE)
+    assert (folder / "renders").is_dir()
+
+
+def test_output_folder_is_not_made_for_an_unsaved_file():
+    from helpers import CUBE, load
+
+    load(CUBE)  # "//renders/" has no base folder yet. Nothing is made and nothing fails.
+    assert settings().output_folder == "//renders/"
+
+
+def test_output_folder_is_made_when_you_save_the_file_after_loading():
+    import tempfile
+    from pathlib import Path
+
+    from helpers import CUBE, load
+
+    load(CUBE)
+    folder = Path(tempfile.mkdtemp(prefix="sliceranim_saved_"))
+    bpy.ops.wm.save_as_mainfile(filepath=str(folder / "test.blend"))
+    assert (folder / "renders").is_dir()

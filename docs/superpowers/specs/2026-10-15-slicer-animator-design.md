@@ -339,6 +339,8 @@ Close-up smoothing is a moving average of the layer center and the layer size ov
 | File type | MP4 (H.264), PNG frames | MP4 |
 | Output folder | Path | `//renders/` |
 
+The plugin makes the output folder when it applies the output settings and when you save the .blend file. A relative path such as `//renders/` needs a saved .blend file, so the folder appears after the first save.
+
 The render engine is Eevee by default. You can switch to Cycles. The plugin does not change the engine after the first import.
 
 ### 11.2 Loading a file

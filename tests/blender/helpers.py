@@ -22,3 +22,25 @@ def reset() -> None:
 
 def settings():
     return bpy.context.scene.sliceranim
+
+
+def evaluated_polygons(obj) -> int:
+    """Polygon count of the evaluated object (3D view evaluation, so Viewport Strand Sides applies)."""
+    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    mesh = evaluated.to_mesh()
+    try:
+        return len(mesh.polygons)
+    finally:
+        evaluated.to_mesh_clear()
+
+
+def evaluated_bounds(obj) -> tuple[np.ndarray, np.ndarray]:
+    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    mesh = evaluated.to_mesh()
+    try:
+        co = np.empty(len(mesh.vertices) * 3)
+        mesh.vertices.foreach_get("co", co)
+    finally:
+        evaluated.to_mesh_clear()
+    co = co.reshape(-1, 3)
+    return co.min(axis=0), co.max(axis=0)

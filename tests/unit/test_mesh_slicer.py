@@ -13,6 +13,7 @@ from sliceranim.core.mesh_slicer import (
     signed_area,
     slice_mesh,
     to_millimeters,
+    write_stl,
 )
 from sliceranim.core.errors import SlicerAnimError
 from sliceranim.core.toolpaths import FEATURE_CODE
@@ -167,3 +168,11 @@ def test_to_millimeters_refuses_a_part_too_large_even_at_1_mm_per_unit():
     v, _ = box(0, 1500, 0, 10, 0, 10)
     with pytest.raises(SlicerAnimError, match="1500 mm across"):
         to_millimeters(v, 1000.0)
+
+
+def test_write_stl_gives_a_binary_stl_that_read_stl_reads_back(tmp_path):
+    v, t = box(0, 20, 0, 20, 0, 10)
+    write_stl(tmp_path / "box.stl", v, t)
+    vertices, triangles = read_stl(tmp_path / "box.stl")
+    assert len(triangles) == 12
+    np.testing.assert_allclose(vertices[triangles], v[t], atol=1e-5)

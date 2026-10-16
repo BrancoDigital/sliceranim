@@ -3,7 +3,18 @@ import subprocess
 
 import pytest
 
-from sliceranim.core.bambu_cli import DEFAULT_PATHS, find_bambu, slice_command, slice_project
+from sliceranim.core.bambu_cli import (
+    DEFAULT_PATHS,
+    DEFAULT_PRESETS,
+    find_bambu,
+    flat_preset,
+    model_slice_command,
+    profiles_dir,
+    slice_command,
+    slice_model,
+    slice_project,
+    write_presets,
+)
 from sliceranim.core.errors import BAMBU_NOT_FOUND, SlicerAnimError
 
 
@@ -75,3 +86,91 @@ def test_find_bambu_raises_when_nothing_exists(tmp_path):
 
 def test_default_paths_match_the_spec():
     assert DEFAULT_PATHS["darwin"] == "/Applications/BambuStudio.app/Contents/MacOS/BambuStudio"
+
+
+def make_profiles(root):
+    """A small copy of the BBL system presets: one chain per kind."""
+    files = {
+        "machine/fdm_machine_common.json": {"name": "fdm_machine_common", "printable_height": "250", "from": "system"},
+        "machine/Printer.json": {"name": "Printer", "inherits": "fdm_machine_common", "nozzle_diameter": ["0.4"]},
+        "process/fdm_process_common.json": {"name": "fdm_process_common", "layer_height": "0.1", "wall_loops": "2"},
+        "process/Standard.json": {"name": "Standard", "inherits": "fdm_process_common", "layer_height": "0.2"},
+        "filament/PLA-PETG.json": {"name": "PLA/PETG", "filament_type": ["PLA"]},
+    }
+    for name, data in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data))
+    (root / "process" / "broken.json").write_text("{not json")
+    return root
+
+
+def test_flat_preset_resolves_the_inherits_chain(tmp_path):
+    preset = flat_preset(make_profiles(tmp_path), "process", "Standard")
+    assert (preset["layer_height"], preset["wall_loops"]) == ("0.2", "2")
+    assert (preset["name"], preset["inherits"], preset["from"]) == ("Standard", "Standard", "User")
+
+
+def test_flat_preset_finds_a_name_that_is_not_the_file_name(tmp_path):
+    assert flat_preset(make_profiles(tmp_path), "filament", "PLA/PETG")["filament_type"] == ["PLA"]
+
+
+def test_unknown_preset_names_the_preset(tmp_path):
+    with pytest.raises(SlicerAnimError, match="Bambu Studio preset not found: Nope. Check the preset names"):
+        flat_preset(make_profiles(tmp_path), "process", "Nope")
+
+
+def test_write_presets_sets_the_layer_height(tmp_path):
+    presets = {"machine": "Printer", "process": "Standard", "filament": "PLA/PETG"}
+    files = write_presets(make_profiles(tmp_path / "BBL"), tmp_path / "out", presets, 0.28)
+    assert [f.name for f in files] == ["machine.json", "process.json", "filament.json"]
+    assert json.loads(files[1].read_text())["layer_height"] == "0.28"
+
+
+def test_model_slice_command(tmp_path):
+    out = tmp_path / "out"
+    command = model_slice_command(tmp_path / "BambuStudio", tmp_path / "part.stl", out,
+                                  [out / "machine.json", out / "process.json", out / "filament.json"])
+    assert command[1:] == [
+        "--slice", "1", "--outputdir", str(out),
+        "--load-settings", f"{out / 'machine.json'};{out / 'process.json'}",
+        "--load-filaments", str(out / "filament.json"),
+        "--arrange", "1", "--orient", "0",
+        str(tmp_path / "part.stl"),
+    ]
+
+
+def test_slice_model_returns_plate_1_gcode(tmp_path):
+    fake = FakeBambu({"return_code": 0, "error_string": "Success."})
+    presets = {"machine": "Printer", "process": "Standard", "filament": "PLA/PETG"}
+    gcode = slice_model(tmp_path / "part.stl", tmp_path / "out", tmp_path / "BambuStudio", presets, 0.2,
+                        profiles=make_profiles(tmp_path / "BBL"), run=fake)
+    assert gcode == tmp_path / "out" / "plate_1.gcode"
+    assert "--load-settings" in fake.calls[0]
+
+
+def test_slice_model_failure_shows_error_string(tmp_path):
+    fake = FakeBambu({"return_code": -100, "error_string": "Plate empty"}, gcode=None)
+    presets = {"machine": "Printer", "process": "Standard", "filament": "PLA/PETG"}
+    with pytest.raises(SlicerAnimError, match="Slicing failed: Plate empty"):
+        slice_model(tmp_path / "part.stl", tmp_path / "out", tmp_path / "BambuStudio", presets, 0.2,
+                    profiles=make_profiles(tmp_path / "BBL"), run=fake)
+
+
+def test_profiles_dir_finds_the_macos_and_windows_layouts(tmp_path):
+    mac = tmp_path / "BambuStudio.app" / "Contents"
+    (mac / "Resources" / "profiles" / "BBL").mkdir(parents=True)
+    assert profiles_dir(mac / "MacOS" / "BambuStudio") == mac / "Resources" / "profiles" / "BBL"
+    win = tmp_path / "Bambu Studio"
+    (win / "resources" / "profiles" / "BBL").mkdir(parents=True)
+    assert profiles_dir(win / "bambu-studio.exe") == win / "resources" / "profiles" / "BBL"
+    with pytest.raises(SlicerAnimError, match="presets not found"):
+        profiles_dir(tmp_path / "elsewhere" / "BambuStudio")
+
+
+def test_default_presets_are_the_p1s_standard_pla_set():
+    assert DEFAULT_PRESETS == {
+        "machine": "Bambu Lab P1S 0.4 nozzle",
+        "process": "0.20mm Standard @BBL X1C",
+        "filament": "Bambu PLA Basic @BBL X1C",
+    }

@@ -38,6 +38,21 @@ def read_stl(path) -> tuple[np.ndarray, np.ndarray]:
     return vertices, np.arange(len(vertices)).reshape(-1, 3)
 
 
+def write_stl(path, vertices: np.ndarray, triangles: np.ndarray) -> None:
+    """Write a binary STL file. Units are as given (mm for a slicer)."""
+    corners = np.asarray(vertices, dtype=np.float64)[np.asarray(triangles)]
+    normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    lengths = np.linalg.norm(normals, axis=1, keepdims=True)
+    normals = np.divide(normals, lengths, out=np.zeros_like(normals), where=lengths > 0)
+    records = np.zeros(len(corners), dtype=[("normal", "<f4", 3), ("corners", "<f4", (3, 3)), ("attribute", "<u2")])
+    records["normal"] = normals
+    records["corners"] = corners
+    with open(path, "wb") as file:
+        file.write(b"sliceranim".ljust(80, b" "))
+        file.write(struct.pack("<I", len(records)))
+        file.write(records.tobytes())
+
+
 def to_millimeters(vertices: np.ndarray, mm_per_unit: float) -> tuple[np.ndarray, bool]:
     """Scale Blender coordinates to mm. Return (vertices in mm, True when 1 unit was read as 1 mm).
 

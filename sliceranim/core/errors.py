@@ -35,3 +35,7 @@ def too_many_polygons(polygons: int) -> str:
 
 def part_too_large(size_mm: float) -> SlicerAnimError:
     return SlicerAnimError(f"This object is {size_mm:.0f} mm across. A print must be smaller than 1000 mm. Scale it down and try again.")
+
+
+def preset_not_found(name: str) -> SlicerAnimError:
+    return SlicerAnimError(f"Bambu Studio preset not found: {name}. Check the preset names in the add-on preferences.")

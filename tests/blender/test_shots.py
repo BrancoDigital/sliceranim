@@ -2,9 +2,9 @@ import json
 
 import bpy
 import numpy as np
-from helpers import CUBE, keyframes, load, settings
+from helpers import CUBE, box_object, keyframes, load, settings
 
-from sliceranim.blender import shots
+from sliceranim.blender import importer, shots
 from sliceranim.core.errors import SlicerAnimError
 
 
@@ -70,7 +70,19 @@ def test_nozzle_keys_follow_the_line_shots():
     load(CUBE)
     s = settings()
     s.nozzle = True
-    assert json.loads(s.line_frame_ranges) == [[1, 600]]
+    assert json.loads(s.nozzle_frame_ranges) == [[1, 600]]
+    assert keyframes(bpy.data.objects["SA Nozzle Tip"], "hide_render").tolist() == [[1.0, 0.0], [601.0, 1.0]]
+
+
+def test_nozzle_shows_in_layer_shots_and_hides_in_hold_shots():
+    """Owner check: the nozzle went away in the Layer shot of the default shot list."""
+    box_object()
+    importer.build(bpy.context, (loaded := importer.read_mesh_object(bpy.context, bpy.context.active_object)),
+                   importer.prepare(bpy.context, loaded), keep_shots=False)
+    s = settings()
+    assert [x.style for x in s.shots] == ["LINE", "LAYER", "LINE", "HOLD"]
+    s.nozzle = True
+    assert json.loads(s.nozzle_frame_ranges) == [[1, 120], [121, 480], [481, 600]]
     assert keyframes(bpy.data.objects["SA Nozzle Tip"], "hide_render").tolist() == [[1.0, 0.0], [601.0, 1.0]]
 
 

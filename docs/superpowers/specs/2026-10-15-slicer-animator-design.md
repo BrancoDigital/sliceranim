@@ -297,7 +297,7 @@ The timing code computes one value for each frame. Rebuild then writes these val
 4. One timeline marker for each shot, bound to the camera of the shot.
 5. The scene start frame (1) and end frame.
 6. The camera keyframes of each shot, from the presets in section 9.
-7. Keyframes on the visibility of the nozzle tip, with constant interpolation. The tip is visible in Line shots and hidden in the other shots.
+7. Keyframes on the visibility of the nozzle tip, with constant interpolation. The tip is visible in Line and Layer shots and hidden in Hold shots. In a Layer shot, the tip stays at the end of the newest complete layer.
 
 Rebuild deletes the markers and keyframes that it wrote before. Before it does this, it warns you that manual changes to these markers will be lost.
 
@@ -326,7 +326,7 @@ Close-up smoothing is a moving average of the layer center and the layer size ov
 | Studio backdrop | A curved floor-and-wall mesh with no visible horizon, 6 times the size of the part | Light gray `#D9D9D9` |
 | Lights | Key, fill, and rim area lights, scaled to the size of the part. You set one color and one intensity for all three. The intensity multiplies the power of each light. | On, white, intensity 1.0 |
 | Plate mat | A 256 mm × 256 mm plane at z = 0 with a procedural textured PEI material. No image files. | Off |
-| Nozzle tip | A brass cone, 6 mm high, parented to the print head. Visible only in Line shots. | Off |
+| Nozzle tip | A brass cone, parented to the print head. Visible in Line and Layer shots. You set its height, because a 6 mm tip is hard to see in a wide shot of a large part. | Off, 6 mm |
 | Ghost | A transparent material on the ghost shell (section 7, step 8). Eevee uses the Dithered render method. You set the color and the opacity. | Off, filament color, 15% opacity |
 
 ## 11. Output and panel

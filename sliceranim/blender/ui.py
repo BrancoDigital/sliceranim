@@ -353,6 +353,8 @@ class SLICERANIM_PT_look(_Panel, bpy.types.Panel):
             layout.prop(settings, "light_intensity")
         layout.prop(settings, "plate_mat")
         layout.prop(settings, "nozzle")
+        if settings.nozzle:
+            layout.prop(settings, "nozzle_size")
 
 
 class SLICERANIM_PT_shots(_Panel, bpy.types.Panel):

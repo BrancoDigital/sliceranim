@@ -249,16 +249,18 @@ def _update_lights(scene, center: Vector, radius: float) -> None:
 
 
 def write_nozzle_keys(scene) -> None:
-    """Show the nozzle tip in Line shots only, with constant keys at the shot boundaries."""
+    """Show the nozzle tip in Line and Layer shots and hide it in Hold shots, with constant keys at the shot boundaries."""
     nozzle = bpy.data.objects.get("SA Nozzle Tip")
     if nozzle is None:
         return
     keys.remove(nozzle, {"hide_render", "hide_viewport"})
-    ranges = json.loads(scene.sliceranim.line_frame_ranges or "[]")
+    ranges = json.loads(scene.sliceranim.nozzle_frame_ranges or "[]")
     starts = {first for first, _ in ranges}
+    ends = {last for _, last in ranges}
     hidden = {1: 1.0}
     for first, _ in ranges:
-        hidden[first] = 0.0
+        if first - 1 not in ends:  # one key where the nozzle shows, not one per shot
+            hidden[first] = 0.0
     for _, last in ranges:
         if last + 1 not in starts:
             hidden[last + 1] = 1.0
@@ -298,6 +300,7 @@ def apply(scene) -> None:
         nozzle = put_object(scene, "SA Nozzle Tip", bpy.data.meshes.get("SA Nozzle Tip") or nozzle_mesh())
         nozzle.parent = settings.head_object
         nozzle.location = (0.0, 0.0, NOZZLE_LIFT_MM * MM)
+        nozzle.scale = (settings.nozzle_size / NOZZLE_HEIGHT_MM,) * 3
         write_nozzle_keys(scene)
     else:
         remove_object("SA Nozzle Tip")

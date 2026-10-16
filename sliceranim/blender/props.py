@@ -150,10 +150,13 @@ class SLICERANIM_PG_settings(bpy.types.PropertyGroup):
                                    default=1.0, min=0.0, soft_max=3.0, update=_looks)
     plate_mat: BoolProperty(name="Plate mat", default=False, update=_looks)
     nozzle: BoolProperty(name="Nozzle tip", default=False, update=_looks)
+    nozzle_size: FloatProperty(name="Nozzle size", description="Height of the nozzle tip in mm",
+                               default=6.0, min=1.0, soft_max=40.0, update=_looks)
     # Shots
     shots: CollectionProperty(type=SLICERANIM_PG_shot)
     active_shot: IntProperty()
-    line_frame_ranges: StringProperty(description="JSON list of [first, last] frames of Line shots, from the last Rebuild")
+    nozzle_frame_ranges: StringProperty(
+        description="JSON list of [first, last] frames of the Line and Layer shots, from the last Rebuild")
     rebuild_signature: StringProperty()
     # Output
     format_preset: EnumProperty(name="Format", items=FORMAT_ITEMS, default="FHD", update=_output)
@@ -172,7 +175,7 @@ USER_SETTINGS = (
     "use_file_color", "color", "finish", "highlight", "highlight_color", "highlight_layers",
     "ghost", "ghost_use_filament_color", "ghost_color", "ghost_opacity",
     "strand_sides", "viewport_strand_sides", "merge_angle", "backdrop", "backdrop_color",
-    "lights", "light_color", "light_intensity", "plate_mat", "nozzle",
+    "lights", "light_color", "light_intensity", "plate_mat", "nozzle", "nozzle_size",
     "format_preset", "custom_width", "custom_height", "fps", "file_type", "output_folder",
 )
 

@@ -72,9 +72,9 @@ def test_plate_mat_sits_on_the_bambu_plate_center_or_under_the_part():
     assert "SA Plate Mat" not in bpy.data.objects
 
 
-def test_nozzle_tip_follows_the_head_and_shows_in_line_shots_only():
+def test_nozzle_tip_follows_the_head_and_shows_in_the_saved_frame_ranges_only():
     s = setup()
-    s.line_frame_ranges = json.dumps([[1, 120], [481, 600]])
+    s.nozzle_frame_ranges = json.dumps([[1, 120], [481, 600]])
     s.nozzle = True
     nozzle = bpy.data.objects["SA Nozzle Tip"]
     assert nozzle.parent == s.head_object
@@ -158,3 +158,10 @@ def test_light_color_and_intensity_reach_the_three_lights():
         light = bpy.data.lights[name]
         np.testing.assert_allclose(tuple(light.color), (1.0, 0.5, 0.25), rtol=1e-6)
         assert abs(light.energy - 0.5 * before[name]) < 1e-6 * before[name]
+
+
+def test_nozzle_size_scales_the_tip():
+    s = setup()
+    s.nozzle = True
+    s.nozzle_size = 18.0
+    np.testing.assert_allclose(tuple(bpy.data.objects["SA Nozzle Tip"].scale), (3.0, 3.0, 3.0))

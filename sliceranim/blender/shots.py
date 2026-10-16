@@ -7,7 +7,7 @@ import bpy
 import numpy as np
 
 from ..core.errors import SlicerAnimError
-from ..core.timing import CUSTOM, LINE, Shot, ShotProblem, default_shots, plan_frames, validate_shots
+from ..core.timing import CUSTOM, HOLD, LINE, Shot, ShotProblem, default_shots, plan_frames, validate_shots
 from . import cameras, keys, looks, nodes, output
 
 MM = 0.001
@@ -113,10 +113,10 @@ def rebuild(scene):
     scene.frame_start = 1
     scene.frame_end = plan.frame_count
     scene.camera = shot_cameras[0]
-    settings.line_frame_ranges = json.dumps([
+    settings.nozzle_frame_ranges = json.dumps([
         [first, first + count - 1]
         for first, count, shot in zip(plan.shot_first_frame, plan.shot_frame_count, shot_list)
-        if shot.style == LINE
+        if shot.style != HOLD
     ])
     looks.write_nozzle_keys(scene)
     settings.rebuild_signature = signature(scene)

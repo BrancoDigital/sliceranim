@@ -10,9 +10,9 @@ import numpy as np
 
 from ..core import bambu_cli, threemf
 from ..core.camera_paths import part_bounds
-from ..core.errors import SlicerAnimError, source_missing
+from ..core.errors import UNITS_AS_MM, SlicerAnimError, source_missing
 from ..core.gcode_reader import read_gcode
-from ..core.mesh_slicer import read_stl, slice_mesh
+from ..core.mesh_slicer import read_stl, slice_mesh, to_millimeters
 from ..core.timing import validate_shots
 from ..core.toolpaths import ToolpathSet, merge_points, pack
 from . import looks, nodes, output, prefs, shots
@@ -39,6 +39,7 @@ class Loaded:
     label: str  # file or object name for the panel and the object name
     open_edges: bool = False
     source_mesh: object = None
+    note: str = ""  # information for the user after the load
 
 
 def slice_dir(project: Path) -> Path:
@@ -71,7 +72,8 @@ def read_file(context, filepath: str) -> Loaded:
 
 
 def read_mesh_object(context, obj) -> Loaded:
-    """Run the fallback slicer on a mesh object. Blender units become mm through the scene unit scale."""
+    """Run the fallback slicer on a mesh object. Blender units become mm through the scene unit scale,
+    or 1 unit becomes 1 mm when the object is too large to print (spec 6.4)."""
     evaluated = obj.evaluated_get(context.evaluated_depsgraph_get())
     mesh = evaluated.to_mesh()
     try:
@@ -84,9 +86,9 @@ def read_mesh_object(context, obj) -> Loaded:
         evaluated.to_mesh_clear()
     matrix = np.array(obj.matrix_world)
     world = co.reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3]
-    scale = context.scene.unit_settings.scale_length / MM
-    tp, open_edges = slice_mesh(world * scale, triangles.reshape(-1, 3))
-    return Loaded(tp, "MESH", "", obj.name, open_edges, obj)
+    millimeters, units_as_mm = to_millimeters(world, context.scene.unit_settings.scale_length / MM)
+    tp, open_edges = slice_mesh(millimeters, triangles.reshape(-1, 3))
+    return Loaded(tp, "MESH", "", obj.name, open_edges, obj, UNITS_AS_MM if units_as_mm else "")
 
 
 def reload_source(context) -> Loaded:

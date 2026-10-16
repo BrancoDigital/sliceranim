@@ -9,6 +9,7 @@ BAMBU_NOT_FOUND = "Bambu Studio not found. Set its path in preferences, or impor
 NO_LAYER_MARKERS = "No layer markers found. Supported slicers: Bambu Studio, OrcaSlicer."
 NO_EXTRUSION = "No printed lines found in this file."
 OPEN_MESH = "The mesh has holes, so some layers can be incomplete."
+UNITS_AS_MM = "The object is too large to print in scene units, so the plugin reads 1 Blender unit as 1 mm."
 NOT_A_PRINT_3MF = "This 3MF file has no G-code and is not a Bambu Studio project."
 
 
@@ -30,3 +31,7 @@ def too_many_polygons(polygons: int) -> str:
         f"This print makes about {millions:.0f} million polygons. "
         "Lower Strand sides or raise Merge angle to make it faster."
     )
+
+
+def part_too_large(size_mm: float) -> SlicerAnimError:
+    return SlicerAnimError(f"This object is {size_mm:.0f} mm across. A print must be smaller than 1000 mm. Scale it down and try again.")

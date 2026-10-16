@@ -11,13 +11,14 @@ from pathlib import Path
 
 import numpy as np
 
-from .errors import NO_EXTRUSION, SlicerAnimError
+from .errors import NO_EXTRUSION, SlicerAnimError, part_too_large
 from .toolpaths import FEATURE_CODE, ToolpathSet, pack
 
 LAYER_HEIGHT = 0.2
 WIDTH = 0.45
 SPEED = 100.0  # mm/s
 MITER_LIMIT = 4.0
+MAX_PART_MM = 1000.0
 _OUTER = FEATURE_CODE["outer_wall"]
 _INNER = FEATURE_CODE["inner_wall"]
 
@@ -35,6 +36,21 @@ def read_stl(path) -> tuple[np.ndarray, np.ndarray]:
     corners = [[float(v) for v in line.split()[1:4]] for line in text.splitlines() if line.strip().startswith("vertex")]
     vertices = np.array(corners, dtype=np.float64).reshape(-1, 3)
     return vertices, np.arange(len(vertices)).reshape(-1, 3)
+
+
+def to_millimeters(vertices: np.ndarray, mm_per_unit: float) -> tuple[np.ndarray, bool]:
+    """Scale Blender coordinates to mm. Return (vertices in mm, True when 1 unit was read as 1 mm).
+
+    The Blender STL import puts 1 mm of the file at 1 unit (1 m). A part larger than MAX_PART_MM cannot
+    be a print, so the plugin then reads 1 unit as 1 mm.
+    """
+    vertices = np.asarray(vertices, dtype=np.float64)
+    size = float(np.ptp(vertices, axis=0).max()) if len(vertices) else 0.0
+    if size * mm_per_unit <= MAX_PART_MM:
+        return vertices * mm_per_unit, False
+    if size > MAX_PART_MM:
+        raise part_too_large(size)
+    return vertices, True
 
 
 def weld(vertices: np.ndarray, triangles: np.ndarray, tolerance: float = 1e-5):

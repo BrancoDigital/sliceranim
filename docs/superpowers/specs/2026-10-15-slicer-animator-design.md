@@ -198,6 +198,8 @@ The fallback slicer takes a triangle mesh in millimeters. The input is a `.stl` 
 
 The offset uses numpy only (section 13). The fallback output has no infill. The panel shows this when the fallback is in use.
 
+A mesh object is in Blender units. The plugin changes them to mm with the unit scale of the scene. The Blender STL import puts 1 mm of the file at 1 unit (1 m), so a 150 mm part becomes 150 m. If the part is larger than 1000 mm, it cannot be a print, so the plugin reads 1 unit as 1 mm and tells you so. If the part is still larger than 1000 mm, the plugin stops with an error. Without this rule, a 150 m part gives about 750,000 layers and Blender stops responding.
+
 ## 7. Toolpath object
 
 The importer builds one mesh object named after the source file:
@@ -389,6 +391,7 @@ The frame rate of the preview on the reference machine is not measured yet. The 
 | No extrusion moves | No printed lines found in this file. |
 | More than 10 million estimated polygons | This print makes about N million polygons. Lower Strand sides or raise Merge angle to make it faster. |
 | Shot list rule fails | The row turns red and shows the rule that failed. |
+| Mesh object larger than 1000 mm, also at 1 unit = 1 mm | This object is N mm across. A print must be smaller than 1000 mm. Scale it down and try again. |
 | Fallback slicer on a mesh with open edges | The mesh has holes, so some layers can be incomplete. |
 | Reload when the source file is gone | Source file not found: `<path>`. Open the file again. |
 

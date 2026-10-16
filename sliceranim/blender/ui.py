@@ -28,6 +28,8 @@ def _finish_load(operator, context, loaded, *, keep_shots: bool) -> set:
     importer.build(context, loaded, tp, keep_shots=keep_shots)
     if loaded.open_edges:
         operator.report({"WARNING"}, OPEN_MESH)
+    if loaded.note:
+        operator.report({"INFO"}, loaded.note)
     return {"FINISHED"}
 
 

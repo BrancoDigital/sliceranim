@@ -7,7 +7,7 @@ import numpy as np
 from helpers import CUBE, box_object, keyframes, load, polygons_at, settings
 
 from sliceranim.blender import importer, nodes
-from sliceranim.core.errors import SlicerAnimError
+from sliceranim.core.errors import UNITS_AS_MM, SlicerAnimError
 
 
 def test_gcode_import_fills_the_source_summary():
@@ -106,3 +106,10 @@ def test_scaled_mesh_object_is_sliced_at_its_world_size():
     bpy.context.view_layer.update()
     loaded = importer.read_mesh_object(bpy.context, box)
     assert loaded.tp.layer_count == 100  # 20 mm high at 0.2 mm per layer
+
+
+def test_mesh_object_from_the_blender_stl_import_is_read_as_mm():
+    box = box_object(size=153.0)  # a 153 mm part, imported at 1 mm per unit
+    loaded = importer.read_mesh_object(bpy.context, box)
+    assert loaded.tp.layer_count == 765
+    assert loaded.note == UNITS_AS_MM

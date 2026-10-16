@@ -12,7 +12,9 @@ from sliceranim.core.mesh_slicer import (
     self_intersects,
     signed_area,
     slice_mesh,
+    to_millimeters,
 )
+from sliceranim.core.errors import SlicerAnimError
 from sliceranim.core.toolpaths import FEATURE_CODE
 
 
@@ -145,3 +147,23 @@ def test_read_binary_and_ascii_stl(tmp_path):
         tp, open_edges = slice_mesh(vertices, triangles)
         assert not open_edges
         assert tp.layer_count == 50
+
+
+def test_to_millimeters_uses_the_scene_unit_scale():
+    v, _ = box(0, 0.02, 0, 0.02, 0, 0.01)  # 20 mm × 20 mm × 10 mm in meters
+    mm, units_as_mm = to_millimeters(v, 1000.0)
+    np.testing.assert_allclose(mm.max(axis=0), [20.0, 20.0, 10.0])
+    assert not units_as_mm
+
+
+def test_to_millimeters_reads_1_unit_as_1_mm_for_a_part_too_large_to_print():
+    v, _ = box(0, 191.8, 0, 191.8, 0, 153.1)  # the Blender STL import puts 1 mm at 1 unit
+    mm, units_as_mm = to_millimeters(v, 1000.0)
+    np.testing.assert_allclose(mm.max(axis=0), [191.8, 191.8, 153.1])
+    assert units_as_mm
+
+
+def test_to_millimeters_refuses_a_part_too_large_even_at_1_mm_per_unit():
+    v, _ = box(0, 1500, 0, 10, 0, 10)
+    with pytest.raises(SlicerAnimError, match="1500 mm across"):
+        to_millimeters(v, 1000.0)

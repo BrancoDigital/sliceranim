@@ -4,10 +4,10 @@ from pathlib import Path
 
 import bpy
 import numpy as np
-from helpers import CUBE, box_object, keyframes, load, polygons_at, settings
+from helpers import CUBE, box_object, box_stl, keyframes, load, need_bambu, no_bambu, polygons_at, settings
 
 from sliceranim.blender import importer, nodes
-from sliceranim.core.errors import UNITS_AS_MM, SlicerAnimError
+from sliceranim.core.errors import FALLBACK_NOTE, UNITS_AS_MM, SlicerAnimError
 
 
 def test_gcode_import_fills_the_source_summary():
@@ -60,7 +60,8 @@ def test_sliced_3mf_loads_like_gcode():
 
 def test_mesh_object_goes_through_the_fallback_slicer():
     box = box_object(size=0.01)
-    loaded = importer.read_mesh_object(bpy.context, box)
+    with no_bambu():
+        loaded = importer.read_mesh_object(bpy.context, box)
     importer.build(bpy.context, loaded, importer.prepare(bpy.context, loaded), keep_shots=False)
     s = settings()
     assert s.used_fallback and s.plate_centered_on_part
@@ -104,12 +105,62 @@ def test_scaled_mesh_object_is_sliced_at_its_world_size():
     box = box_object(size=0.01)
     box.scale = (1.0, 1.0, 2.0)
     bpy.context.view_layer.update()
-    loaded = importer.read_mesh_object(bpy.context, box)
+    with no_bambu():
+        loaded = importer.read_mesh_object(bpy.context, box)
     assert loaded.tp.layer_count == 100  # 20 mm high at 0.2 mm per layer
 
 
 def test_mesh_object_from_the_blender_stl_import_is_read_as_mm():
     box = box_object(size=153.0)  # a 153 mm part, imported at 1 mm per unit
-    loaded = importer.read_mesh_object(bpy.context, box)
+    with no_bambu():
+        loaded = importer.read_mesh_object(bpy.context, box)
     assert loaded.tp.layer_count == 765
-    assert loaded.note == UNITS_AS_MM
+    assert loaded.note.startswith(UNITS_AS_MM)
+
+
+def test_stl_file_is_sliced_with_bambu_studio():
+    """Owner check: the fallback slicer has no top layers, so an STL goes to Bambu Studio when it is installed."""
+    need_bambu()
+    load(box_stl(Path(tempfile.mkdtemp()) / "box.stl"))
+    s = settings()
+    assert (s.source_kind, s.layer_count, s.used_fallback) == ("STL", 50, False)
+    assert "Bambu" in s.slicer
+    tp = importer.toolpath_from_object(s.toolpath_object)
+    assert 6 in set(np.unique(tp.feature).tolist())  # top surface
+    np.testing.assert_allclose(tuple(s.file_color), (0.2158605,) * 3, rtol=1e-4)  # gray: an STL has no color
+
+
+def test_layer_height_applies_to_stl_slicing_and_reload():
+    need_bambu()
+    load(box_stl(Path(tempfile.mkdtemp()) / "box.stl"))
+    s = settings()
+    s.layer_height = 0.25
+    loaded = importer.reload_source(bpy.context)
+    assert loaded.tp.layer_count == 40
+
+
+def test_stl_file_without_bambu_studio_uses_the_fallback_and_says_so():
+    with no_bambu():
+        loaded = importer.read_file(bpy.context, str(box_stl(Path(tempfile.mkdtemp()) / "box.stl")))
+    assert loaded.tp.meta.get("fallback") and loaded.note == FALLBACK_NOTE
+    settings().layer_height = 0.25
+    with no_bambu():
+        loaded = importer.read_file(bpy.context, loaded.source_path)
+    assert loaded.tp.layer_count == 40
+
+
+def test_mesh_object_is_sliced_with_bambu_studio():
+    need_bambu()
+    box = box_object(size=0.02)
+    loaded = importer.read_mesh_object(bpy.context, box)
+    importer.build(bpy.context, loaded, importer.prepare(bpy.context, loaded), keep_shots=False)
+    s = settings()
+    assert (s.source_kind, s.layer_count, s.used_fallback) == ("MESH", 100, False)
+    assert s.source_mesh == box and box.hide_render
+
+
+def test_presets_default_to_p1s_standard_pla():
+    from sliceranim.blender import prefs
+    from sliceranim.core.bambu_cli import DEFAULT_PRESETS
+
+    assert prefs.presets(bpy.context) == DEFAULT_PRESETS

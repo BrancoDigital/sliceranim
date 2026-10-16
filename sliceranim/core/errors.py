@@ -10,6 +10,7 @@ NO_LAYER_MARKERS = "No layer markers found. Supported slicers: Bambu Studio, Orc
 NO_EXTRUSION = "No printed lines found in this file."
 OPEN_MESH = "The mesh has holes, so some layers can be incomplete."
 UNITS_AS_MM = "The object is too large to print in scene units, so the plugin reads 1 Blender unit as 1 mm."
+FALLBACK_NOTE = "Bambu Studio not found, so the plugin used the fallback slicer: 2 walls, no infill."
 NOT_A_PRINT_3MF = "This 3MF file has no G-code and is not a Bambu Studio project."
 
 

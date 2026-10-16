@@ -26,7 +26,7 @@ The users are the owner and a small group of people that the owner sends the ext
 
 1. Input from Bambu Studio and OrcaSlicer G-code (`.gcode`, `.gcode.3mf`).
 2. Headless slicing of a Bambu Studio project `.3mf` with one plate.
-3. A fallback slicer for a `.stl` file or for a mesh object in the scene.
+3. Slicing of a `.stl` file or of a mesh object in the scene with Bambu Studio and its system presets. A fallback slicer when Bambu Studio is not installed.
 4. One filament color per print. The data format keeps a filament number for each point, for multi-color support later.
 5. A shot list that controls build style, timing, and camera for each part of the video.
 6. Six camera presets: turntable orbit, hero, rising follow, close-up, final reveal, and your own camera.
@@ -183,11 +183,31 @@ The output directory is `<blend directory>/slices/` when the `.blend` file is sa
 
 Tested on 2026-10-15 with Bambu Studio 2.08.02.61: `samples/sample.3mf` sliced in 2.4 seconds to 764 layers and 4 h 11 min of print time. The G-code reader makes 378,247 strand points from it, with arcs split at 0.5 mm. Merging at 2° leaves 306,701 points.
 
+#### Slicing a mesh
+
+A `.stl` file and a mesh object have no slicer settings. The plugin slices them with three Bambu Studio system presets. You set their names in the add-on preferences:
+
+| Preset | Default |
+|---|---|
+| Printer | Bambu Lab P1S 0.4 nozzle |
+| Process | 0.20mm Standard @BBL X1C |
+| Filament | Bambu PLA Basic @BBL X1C |
+
+The command line accepts only flat presets. A system preset in `<Bambu Studio resources>/profiles/BBL/<machine, process, or filament>/` names a parent preset in its `inherits` field. The plugin merges the chain from the root to the named preset. It then sets `inherits` to the preset name and `from` to `User`, because Bambu Studio checks that the process fits the printer by the `inherits` name. Without this step, Bambu Studio slices nothing ("plate empty"). The plugin sets `layer_height` in the process preset to the Layer height from the panel (default 0.2 mm). It writes the three presets to the output directory and runs:
+
+```
+<BambuStudio> --slice 1 --outputdir <dir> --load-settings "<machine.json>;<process.json>" --load-filaments <filament.json> --arrange 1 --orient 0 <part.stl>
+```
+
+For a mesh object, the plugin first writes the mesh in mm (section 6.4 gives the unit rule) to `<dir>/<object name>.stl`. Bambu Studio places the part in the middle of the plate and keeps its orientation. A mesh has no filament color, so the filament material is gray.
+
+Tested on 2026-10-16 with `samples/sample.stl`: Use selected object after the Blender STL import takes 5 seconds and gives 764 layers, with infill and top surfaces. Merging at 2° leaves 307,953 points. At a layer height of 0.28 mm, it gives 546 layers and 244,091 points.
+
 ### 6.4 Fallback slicer
 
-The fallback slicer takes a triangle mesh in millimeters. The input is a `.stl` file or a mesh object that you select in the scene.
+The plugin uses the fallback slicer for a `.stl` file or a mesh object only when Bambu Studio is not found. The panel then tells you so. The fallback slicer takes a triangle mesh in millimeters.
 
-1. Cut the mesh with a horizontal plane at the middle of each layer. The default layer height is 0.2 mm.
+1. Cut the mesh with a horizontal plane at the middle of each layer. The layer height comes from the panel (default 0.2 mm).
 2. Join the cut segments into closed loops.
 3. Make two strand loops for each closed outline. The strand width (w) is 0.45 mm. Offset both loops toward the material side of the outline. This is inward for an outer outline and outward for a hole.
    - The outer loop is offset by w / 2 (0.225 mm), so the part keeps its true size. Its feature is `outer_wall`.
@@ -352,18 +372,18 @@ All of these use the same load operator:
 1. Panel: Source, then Open file. Accepts `.gcode`, `.gcode.3mf`, `.3mf`, and `.stl`.
 2. Menu: File, then Import, then Print Toolpaths (.gcode, .3mf, .stl).
 3. Drag and drop of a `.gcode` or `.3mf` file onto the 3D view. The plugin does not take `.stl` drops, because the Blender STL import already takes them.
-4. Panel: Source, then Use selected object. This runs the fallback slicer on the selected mesh object.
+4. Panel: Source, then Use selected object. This slices the selected mesh object (section 6.3, Slicing a mesh). You can import or model a part in Blender first and then use it.
 
 ### 11.3 Panel
 
 The panel is a tab named "Slicer Anim" in the sidebar of the 3D view. It has four sections, in the order that you use them:
 
-1. Source: the load buttons from 11.2, Reload (section 7), a summary of slicer, layer count, print time, and point count, and Reset to Defaults. Reset to Defaults asks you to confirm. Then it sets the Look and Output settings and the shot list back to their defaults and runs Rebuild. The loaded print stays.
-2. Look: color, finish, highlight, ghost, strand detail, backdrop, plate mat, nozzle tip.
+1. Source: the load buttons from 11.2, Layer height for a `.stl` file or a mesh object, Reload (section 7), a summary of slicer, layer count, print time, and point count, and Reset to Defaults. Reset to Defaults asks you to confirm. Then it sets the Look and Output settings and the shot list back to their defaults and runs Rebuild. The loaded print stays.
+2. Look: color, finish, highlight, ghost, strand detail, backdrop, lights (color and intensity), plate mat, nozzle tip (size).
 3. Shots: the shot list, with buttons to add, remove, and move shots.
 4. Output: the settings from 11.1, plus Rebuild, Preview, and Render.
 
-The plugin stores its settings in a property group on the scene. The Bambu Studio path is an add-on preference.
+The plugin stores its settings in a property group on the scene. The Bambu Studio path and the three presets for slicing a mesh are add-on preferences. Reload shows in red when the Merge angle, or the Layer height of a `.stl` file or mesh object, changed since the last load.
 
 ### 11.4 Preview
 
@@ -387,6 +407,8 @@ The frame rate of the preview on the reference machine is not measured yet. The 
 | More than one plate | This file has N plates. Export one plate from your slicer and try again. |
 | Bambu Studio is not found | Bambu Studio not found. Set its path in preferences, or import a sliced file. |
 | Headless slicing fails | Slicing failed: `<error_string from result.json>` |
+| A preset name in preferences is not a system preset | Bambu Studio preset not found: `<name>`. Check the preset names in the add-on preferences. |
+| A `.stl` file or mesh object without Bambu Studio | Bambu Studio not found, so the plugin used the fallback slicer: 2 walls, no infill. |
 | No layer markers in the G-code | No layer markers found. Supported slicers: Bambu Studio, OrcaSlicer. |
 | No extrusion moves | No printed lines found in this file. |
 | More than 10 million estimated polygons | This print makes about N million polygons. Lower Strand sides or raise Merge angle to make it faster. |

@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 
 import bpy
-from helpers import CUBE, box_object, settings
+from helpers import CUBE, box_object, no_bambu, settings
 
 from sliceranim.blender import importer, shots, ui
 
@@ -57,7 +57,8 @@ def test_large_print_waits_for_confirmation():
 
 def test_use_selected_object_operator():
     box_object()
-    assert bpy.ops.sliceranim.use_selected() == {"FINISHED"}
+    with no_bambu():
+        assert bpy.ops.sliceranim.use_selected() == {"FINISHED"}
     assert settings().used_fallback
 
 
@@ -97,7 +98,8 @@ def test_import_menu_entry_exists():
 
 def load_box_with_50_layers():
     box_object()
-    assert bpy.ops.sliceranim.use_selected() == {"FINISHED"}
+    with no_bambu():
+        assert bpy.ops.sliceranim.use_selected() == {"FINISHED"}
     assert settings().layer_count == 50 and len(settings().shots) == 4
 
 

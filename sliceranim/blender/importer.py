@@ -10,9 +10,9 @@ import numpy as np
 
 from ..core import bambu_cli, threemf
 from ..core.camera_paths import part_bounds
-from ..core.errors import UNITS_AS_MM, SlicerAnimError, source_missing
+from ..core.errors import FALLBACK_NOTE, UNITS_AS_MM, SlicerAnimError, source_missing
 from ..core.gcode_reader import read_gcode
-from ..core.mesh_slicer import read_stl, slice_mesh, to_millimeters
+from ..core.mesh_slicer import read_stl, slice_mesh, to_millimeters, write_stl
 from ..core.timing import validate_shots
 from ..core.toolpaths import ToolpathSet, merge_points, pack
 from . import looks, nodes, output, prefs, shots
@@ -49,6 +49,23 @@ def slice_dir(project: Path) -> Path:
     return Path(tempfile.mkdtemp(prefix="sliceranim_"))
 
 
+def slice_stl(context, stl: Path, out_dir: Path) -> tuple[ToolpathSet, bool, str]:
+    """Slice an STL file in mm with Bambu Studio, or with the fallback slicer when Bambu Studio is not found.
+
+    Return (toolpaths, open edges, note for the user).
+    """
+    layer_height = context.scene.sliceranim.layer_height
+    try:
+        bambu = bambu_cli.find_bambu(prefs.bambu_path(context))
+    except SlicerAnimError:
+        tp, open_edges = slice_mesh(*read_stl(stl), layer_height=layer_height)
+        return tp, open_edges, FALLBACK_NOTE
+    gcode = bambu_cli.slice_model(stl, out_dir, bambu, prefs.presets(context), layer_height)
+    tp = read_gcode(gcode)
+    tp.meta["filament_colors"] = []  # a mesh has no filament color, so the material is gray, not the preset color
+    return tp, False, ""
+
+
 def read_file(context, filepath: str) -> Loaded:
     path = Path(bpy.path.abspath(filepath))
     if not path.is_file():
@@ -65,14 +82,13 @@ def read_file(context, filepath: str) -> Loaded:
         gcode = bambu_cli.slice_project(path, slice_dir(path), bambu)
         return Loaded(read_gcode(gcode), "PROJECT", str(gcode), path.name)
     if name.endswith(".stl"):
-        vertices, triangles = read_stl(path)
-        tp, open_edges = slice_mesh(vertices, triangles)
-        return Loaded(tp, "STL", str(path), path.name, open_edges)
+        tp, open_edges, note = slice_stl(context, path, slice_dir(path))
+        return Loaded(tp, "STL", str(path), path.name, open_edges, note=note)
     raise SlicerAnimError(f"Unsupported file type: {path.suffix}. Use .gcode, .gcode.3mf, .3mf, or .stl.")
 
 
 def read_mesh_object(context, obj) -> Loaded:
-    """Run the fallback slicer on a mesh object. Blender units become mm through the scene unit scale,
+    """Slice a mesh object like an STL file. Blender units become mm through the scene unit scale,
     or 1 unit becomes 1 mm when the object is too large to print (spec 6.4)."""
     evaluated = obj.evaluated_get(context.evaluated_depsgraph_get())
     mesh = evaluated.to_mesh()
@@ -87,8 +103,13 @@ def read_mesh_object(context, obj) -> Loaded:
     matrix = np.array(obj.matrix_world)
     world = co.reshape(-1, 3) @ matrix[:3, :3].T + matrix[:3, 3]
     millimeters, units_as_mm = to_millimeters(world, context.scene.unit_settings.scale_length / MM)
-    tp, open_edges = slice_mesh(millimeters, triangles.reshape(-1, 3))
-    return Loaded(tp, "MESH", "", obj.name, open_edges, obj, UNITS_AS_MM if units_as_mm else "")
+    out_dir = slice_dir(Path(bpy.path.clean_name(obj.name)))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stl = out_dir / f"{bpy.path.clean_name(obj.name)}.stl"
+    write_stl(stl, millimeters, triangles.reshape(-1, 3))
+    tp, open_edges, note = slice_stl(context, stl, out_dir)
+    note = " ".join(n for n in (UNITS_AS_MM if units_as_mm else "", note) if n)
+    return Loaded(tp, "MESH", "", obj.name, open_edges, obj, note)
 
 
 def reload_source(context) -> Loaded:
@@ -104,8 +125,7 @@ def reload_source(context) -> Loaded:
     if settings.source_kind == "SLICED_3MF":
         tp = threemf.read_sliced_3mf(path)
     elif settings.source_kind == "STL":
-        tp, open_edges = slice_mesh(*read_stl(path))
-        return Loaded(tp, "STL", str(path), settings.source_label, open_edges)
+        return read_file(context, str(path))
     else:
         tp = read_gcode(path)
     return Loaded(tp, settings.source_kind, str(path), settings.source_label)
@@ -209,6 +229,7 @@ def build(context, loaded: Loaded, tp: ToolpathSet, *, keep_shots: bool) -> bpy.
     settings.used_fallback = bool(tp.meta.get("fallback"))
     settings.plate_centered_on_part = bool(tp.meta.get("fallback"))
     settings.built_merge_angle = math.radians(tp.meta.get("merge_angle", 0.0))
+    settings.built_layer_height = settings.layer_height if loaded.kind in ("STL", "MESH") else -1.0
     settings.part_center = bounds.center.tolist()
     settings.part_radius = bounds.radius
     settings.file_color = _file_color(tp)

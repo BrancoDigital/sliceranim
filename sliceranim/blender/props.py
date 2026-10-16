@@ -125,6 +125,10 @@ class SLICERANIM_PG_settings(bpy.types.PropertyGroup):
     plate_centered_on_part: BoolProperty()
     file_color: FloatVectorProperty(subtype="COLOR", size=3, default=(0.216, 0.216, 0.216), min=0.0, max=1.0)  # #808080
     engine_set: BoolProperty(description="The first import already set the render engine")
+    layer_height: FloatProperty(
+        name="Layer height", description="Layer height in mm when the plugin slices an STL file or a mesh object",
+        default=0.2, min=0.04, max=1.0, soft_min=0.08, soft_max=0.28, step=1, precision=2)
+    built_layer_height: FloatProperty(default=-1.0)
     # Look
     use_file_color: BoolProperty(name="Color from file", default=True, update=_looks)
     color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(0.216, 0.216, 0.216), min=0.0, max=1.0, update=_looks)

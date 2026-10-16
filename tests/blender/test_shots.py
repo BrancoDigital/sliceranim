@@ -2,7 +2,7 @@ import json
 
 import bpy
 import numpy as np
-from helpers import CUBE, box_object, keyframes, load, settings
+from helpers import CUBE, box_object, keyframes, load, no_bambu, settings
 
 from sliceranim.blender import importer, shots
 from sliceranim.core.errors import SlicerAnimError
@@ -77,8 +77,9 @@ def test_nozzle_keys_follow_the_line_shots():
 def test_nozzle_shows_in_layer_shots_and_hides_in_hold_shots():
     """Owner check: the nozzle went away in the Layer shot of the default shot list."""
     box_object()
-    importer.build(bpy.context, (loaded := importer.read_mesh_object(bpy.context, bpy.context.active_object)),
-                   importer.prepare(bpy.context, loaded), keep_shots=False)
+    with no_bambu():
+        loaded = importer.read_mesh_object(bpy.context, bpy.context.active_object)
+    importer.build(bpy.context, loaded, importer.prepare(bpy.context, loaded), keep_shots=False)
     s = settings()
     assert [x.style for x in s.shots] == ["LINE", "LAYER", "LINE", "HOLD"]
     s.nozzle = True

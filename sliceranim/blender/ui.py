@@ -70,7 +70,7 @@ class SLICERANIM_OT_load_file(_LoadBase, bpy.types.Operator):
 
 
 class SLICERANIM_OT_use_selected(_LoadBase, bpy.types.Operator):
-    """Run the fallback slicer on the selected mesh object"""
+    """Slice the selected mesh object with Bambu Studio, or with the fallback slicer"""
 
     bl_idname = "sliceranim.use_selected"
     bl_label = "Use Selected Object"
@@ -86,7 +86,7 @@ class SLICERANIM_OT_use_selected(_LoadBase, bpy.types.Operator):
 
 
 class SLICERANIM_OT_reload(_LoadBase, bpy.types.Operator):
-    """Read the source again with the new Merge angle"""
+    """Read the source again with the new Merge angle and Layer height"""
 
     bl_idname = "sliceranim.reload"
     bl_label = "Reload"
@@ -303,9 +303,12 @@ class SLICERANIM_PT_source(_Panel, bpy.types.Panel):
         layout = self.layout
         layout.operator(SLICERANIM_OT_load_file.bl_idname, icon="FILEBROWSER")
         layout.operator(SLICERANIM_OT_use_selected.bl_idname, icon="MESH_DATA")
+        layout.prop(settings, "layer_height", text="Layer height (STL, mesh)")
         if settings.toolpath_object is None:
             return
-        if abs(settings.merge_angle - settings.built_merge_angle) > 1e-6:
+        layer_height_changed = (settings.source_kind in ("STL", "MESH")
+                                and abs(settings.layer_height - settings.built_layer_height) > 1e-6)
+        if abs(settings.merge_angle - settings.built_merge_angle) > 1e-6 or layer_height_changed:
             row = layout.row()
             row.alert = True
             row.operator(SLICERANIM_OT_reload.bl_idname, icon="FILE_REFRESH")
@@ -317,6 +320,7 @@ class SLICERANIM_PT_source(_Panel, bpy.types.Panel):
         box.label(text=f"{settings.point_count:,} points")
         if settings.used_fallback:
             box.label(text="Fallback slicer: 2 walls, no infill.", icon="INFO")
+            box.label(text="Install Bambu Studio for a full slice.")
         layout.operator(SLICERANIM_OT_reset_defaults.bl_idname, icon="LOOP_BACK")
 
 

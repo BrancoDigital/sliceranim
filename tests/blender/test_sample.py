@@ -57,3 +57,19 @@ def test_sample_render_smoke():
         print(f"    frame {frame}: rendered in {time.perf_counter() - start:.2f} s")
         assert (folder / f"frame_{frame:04d}.png").is_file()
     print(f"    look at the frames in {folder}")
+
+
+def test_sample_stl_from_the_blender_stl_import_slices_like_the_project():
+    """Owner check: Use Selected Object on the imported sample.stl froze Blender and had no top layers."""
+    stl = SAMPLE_3MF.with_name("sample.stl")
+    if not stl.is_file():
+        raise Skip("samples/sample.stl is not present")
+    need_sample()
+    bpy.ops.wm.stl_import(filepath=str(stl))
+    start = time.perf_counter()
+    assert bpy.ops.sliceranim.use_selected() == {"FINISHED"}
+    seconds = time.perf_counter() - start
+    s = settings()
+    print(f"    use selected: {seconds:.2f} s, {s.layer_count} layers, {s.point_count} points after merging")
+    assert (s.source_kind, s.layer_count, s.used_fallback) == ("MESH", 764, False)
+    assert seconds < 20.0

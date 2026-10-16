@@ -1,5 +1,6 @@
 """Shared helpers for the Blender tests."""
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import bpy
@@ -81,3 +82,40 @@ def box_object(name: str = "Box", size: float = 0.01):
     bpy.context.scene.collection.objects.link(obj)
     bpy.context.view_layer.objects.active = obj
     return obj
+
+
+@contextmanager
+def no_bambu():
+    """Act as if Bambu Studio is not installed, so STL files and mesh objects go through the fallback slicer."""
+    from sliceranim.core import bambu_cli
+    from sliceranim.core.errors import BAMBU_NOT_FOUND, SlicerAnimError
+
+    def missing(*args, **kwargs):
+        raise SlicerAnimError(BAMBU_NOT_FOUND)
+
+    original, bambu_cli.find_bambu = bambu_cli.find_bambu, missing
+    try:
+        yield
+    finally:
+        bambu_cli.find_bambu = original
+
+
+def need_bambu() -> None:
+    from sliceranim.core.bambu_cli import DEFAULT_PATHS
+
+    if not Path(DEFAULT_PATHS["darwin"]).is_file():
+        raise Skip("needs Bambu Studio")
+
+
+def box_stl(path, size_mm: float = 20.0, height_mm: float = 10.0):
+    """A closed box STL file in mm."""
+    import numpy as np
+
+    from sliceranim.core.mesh_slicer import write_stl
+
+    a, h = size_mm, height_mm
+    v = np.array([[0, 0, 0], [a, 0, 0], [a, a, 0], [0, a, 0], [0, 0, h], [a, 0, h], [a, a, h], [0, a, h]], dtype=float)
+    t = np.array([[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4],
+                  [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]])
+    write_stl(path, v, t)
+    return Path(path)

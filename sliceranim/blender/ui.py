@@ -368,6 +368,7 @@ class SLICERANIM_PT_shots(_Panel, bpy.types.Panel):
         scene = context.scene
         settings = scene.sliceranim
         layout = self.layout
+        layout.prop(settings, "framing")
         row = layout.row()
         row.template_list("SLICERANIM_UL_shots", "", settings, "shots", settings, "active_shot", rows=4)
         column = row.column(align=True)

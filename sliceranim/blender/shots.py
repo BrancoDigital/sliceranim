@@ -55,6 +55,7 @@ def signature(scene) -> str:
         "points": settings.point_count,
         "merge": round(settings.built_merge_angle, 6),
         "radius": round(settings.part_radius, 6),
+        "framing": settings.framing,
         "cursor": [round(v, 6) for v in scene.cursor.location],
         "object": settings.toolpath_object.name if settings.toolpath_object else "",
     }
@@ -118,7 +119,7 @@ def rebuild(scene):
         for first, count, shot in zip(plan.shot_first_frame, plan.shot_frame_count, shot_list)
         if shot.style != HOLD
     ])
-    looks.write_nozzle_keys(scene)
+    looks.apply(scene)  # the backdrop grows to enclose the cameras; this also writes the nozzle keys
     settings.rebuild_signature = signature(scene)
     scene.frame_set(scene.frame_current)
     return plan

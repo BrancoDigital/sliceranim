@@ -122,6 +122,7 @@ class SLICERANIM_PG_settings(bpy.types.PropertyGroup):
     built_merge_angle: FloatProperty(subtype="ANGLE", default=-1.0)
     part_center: FloatVectorProperty(size=3, description="Part center in mm")
     part_radius: FloatProperty(description="Bounding sphere radius in mm")
+    camera_reach: FloatProperty(description="Distance in mm of the farthest shot camera from the framed center, from the last Rebuild")
     plate_centered_on_part: BoolProperty()
     file_color: FloatVectorProperty(subtype="COLOR", size=3, default=(0.216, 0.216, 0.216), min=0.0, max=1.0)  # #808080
     engine_set: BoolProperty(description="The first import already set the render engine")
@@ -157,6 +158,11 @@ class SLICERANIM_PG_settings(bpy.types.PropertyGroup):
     nozzle_size: FloatProperty(name="Nozzle size", description="Height of the nozzle tip in mm",
                                default=6.0, min=1.0, soft_max=40.0, update=_looks)
     # Shots
+    framing: EnumProperty(
+        name="Framing",
+        items=[("PART", "Part", "Frame the whole part in every shot except Close-up"),
+               ("VOLUME", "Print volume", "Frame the whole print volume of a Bambu Lab P1S (256 × 256 × 250 mm)")],
+        default="PART", update=_looks)
     shots: CollectionProperty(type=SLICERANIM_PG_shot)
     active_shot: IntProperty()
     nozzle_frame_ranges: StringProperty(
@@ -180,7 +186,7 @@ USER_SETTINGS = (
     "ghost", "ghost_use_filament_color", "ghost_color", "ghost_opacity",
     "strand_sides", "viewport_strand_sides", "merge_angle", "backdrop", "backdrop_color",
     "lights", "light_color", "light_intensity", "plate_mat", "nozzle", "nozzle_size",
-    "format_preset", "custom_width", "custom_height", "fps", "file_type", "output_folder",
+    "framing", "format_preset", "custom_width", "custom_height", "fps", "file_type", "output_folder",
 )
 
 CLASSES = (SLICERANIM_PG_shot, SLICERANIM_PG_settings)

@@ -323,13 +323,20 @@ Rebuild deletes the markers and keyframes that it wrote before. Before it does t
 
 ## 9. Cameras
 
-Each shot gets its own camera object. Every preset frames the part from the bounding box of the complete toolpaths and the aspect ratio of the output. The framing distance is the radius of the bounding sphere divided by `sin(fov / 2)`, times a margin of 1.15. The fov is the smaller of the horizontal and vertical field of view.
+Each shot gets its own camera object. Every preset frames the part from the bounding box of the complete toolpaths and the aspect ratio of the output. Every shot except Close-up keeps the whole part in the image on every frame. My camera is the exception, because you place it.
+
+The Framing setting in the Shots section sets what the cameras frame:
+
+- Part (default): the bounding box of the complete toolpaths.
+- Print volume: the print volume of a Bambu Lab P1S, 256 mm × 256 mm × 250 mm, on the plate. The part then shows at its real size in the printer.
+
+The backdrop and the lights scale with what the cameras frame. The framing distance is the radius of the bounding sphere divided by `sin(fov / 2)`, times a margin of 1.15. The fov is the smaller of the horizontal and vertical field of view.
 
 | Preset | Behavior | Settings and defaults |
 |---|---|---|
 | Turntable orbit | Circles the center of the part | Turns per shot (1), height angle (25°), direction (counterclockwise) |
 | Hero | Stays at a three-quarter view | Height angle (30°), side angle (35°) |
-| Rising follow | Moves up with the current layer height and aims at the print head height | Distance (framing distance), height angle (20°) |
+| Rising follow | Moves up with the current layer height and aims at the print head height. Without a set distance, the camera stays at one distance for the shot, far enough away that the whole part is in view on every frame. A set distance is used as is. | Distance (fits the whole part), height angle (20°) |
 | Close-up | Frames the full layer that is printing. It aims at the center of that layer, or at a point that you pick with the 3D cursor, and stays at the framing distance of the layer. | Target (current layer), smoothing (15 frames), depth of field (off, f/2.8 when on) |
 | Final reveal | Pulls back from the framing of the previous shot in the first 40% of the shot. Spins around the finished part in the remaining 60%. As the first shot, it starts at the framing distance. | Spin amount (90°), pull-back share (40%) |
 | My camera | Uses a camera that you place. The plugin does not change it. | Camera object |
@@ -343,7 +350,7 @@ Close-up smoothing is a moving average of the layer center and the layer size ov
 | Filament material | Principled BSDF. The color comes from the file, and you can override it. | Color from file. Gray `#808080` when the file has no color. |
 | Finish presets | Matte, Glossy, Silk, Translucent. Each preset sets roughness, specular, sheen, and transmission. | Matte |
 | Active-layer highlight | The material mixes an emission color with the filament color by the `heat` attribute. | On, orange `#FF6A1A`, 3 layers |
-| Studio backdrop | A curved floor-and-wall mesh with no visible horizon, 6 times the size of the part | Light gray `#D9D9D9` |
+| Studio backdrop | A curved floor-and-wall mesh with no visible horizon, 6 times the size of what the cameras frame. Rebuild makes it larger when a shot camera is farther away, so that its radius is at least 1.25 times the distance of the farthest shot camera. A camera outside the backdrop sees its dark outer side. | Light gray `#D9D9D9` |
 | Lights | Key, fill, and rim area lights, scaled to the size of the part. You set one color and one intensity for all three. The intensity multiplies the power of each light. | On, white, intensity 1.0 |
 | Plate mat | A 256 mm × 256 mm plane at z = 0 with a procedural textured PEI material. No image files. | Off |
 | Nozzle tip | A brass cone, parented to the print head. Visible in Line and Layer shots. You set its height, because a 6 mm tip is hard to see in a wide shot of a large part. | Off, 6 mm |
@@ -380,7 +387,7 @@ The panel is a tab named "Slicer Anim" in the sidebar of the 3D view. It has fou
 
 1. Source: the load buttons from 11.2, Layer height for a `.stl` file or a mesh object, Reload (section 7), a summary of slicer, layer count, print time, and point count, and Reset to Defaults. Reset to Defaults asks you to confirm. Then it sets the Look and Output settings and the shot list back to their defaults and runs Rebuild. The loaded print stays.
 2. Look: color, finish, highlight, ghost, strand detail, backdrop, lights (color and intensity), plate mat, nozzle tip (size).
-3. Shots: the shot list, with buttons to add, remove, and move shots.
+3. Shots: Framing (section 9), and the shot list, with buttons to add, remove, and move shots.
 4. Output: the settings from 11.1, plus Rebuild, Preview, and Render.
 
 The plugin stores its settings in a property group on the scene. The Bambu Studio path and the three presets for slicing a mesh are add-on preferences. Reload shows in red when the Merge angle, or the Layer height of a `.stl` file or mesh object, changed since the last load.

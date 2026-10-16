@@ -7,7 +7,7 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-from ..core.camera_paths import START_AZIMUTH
+from ..core.camera_paths import START_AZIMUTH, Bounds, volume_bounds
 from . import keys
 
 MM = 0.001
@@ -29,6 +29,7 @@ LIGHTS = {
 PLATE_SIZE_MM = 256.0
 BAMBU_PLATE_CENTER_MM = (128.0, 128.0)
 NOZZLE_HEIGHT_MM = 6.0
+BACKDROP_REACH = 1.25  # backdrop radius over the distance of the farthest shot camera
 NOZZLE_LIFT_MM = 0.1  # strands are drawn centered on the nozzle height, so lift the tip by half a layer
 
 
@@ -174,9 +175,18 @@ def update_materials(scene) -> None:
     _principled(backdrop_material()).inputs["Roughness"].default_value = 0.8
 
 
+def framed_bounds(settings) -> Bounds:
+    """What the cameras, backdrop, and lights frame (mm): the part, or the print volume (spec section 9)."""
+    if settings.framing == "VOLUME":
+        middle = tuple(settings.part_center)[:2] if settings.plate_centered_on_part else BAMBU_PLATE_CENTER_MM
+        return volume_bounds(middle)
+    return Bounds(center=np.array(settings.part_center, dtype=np.float64), radius=settings.part_radius)
+
+
 def _part(settings) -> tuple[Vector, float]:
-    """Part center (m) and bounding sphere radius (m)."""
-    return Vector(settings.part_center) * MM, max(settings.part_radius * MM, 0.005)
+    """Center (m) and bounding sphere radius (m) of what the cameras frame."""
+    bounds = framed_bounds(settings)
+    return Vector(bounds.center.tolist()) * MM, max(bounds.radius * MM, 0.005)
 
 
 def backdrop_mesh(radius: float, segments: int = 64) -> bpy.types.Mesh:
@@ -279,7 +289,9 @@ def apply(scene) -> None:
     center, radius = _part(settings)
     floor = Vector((center.x, center.y, -0.2 * MM))
     if settings.backdrop:
-        backdrop = put_object(scene, "SA Backdrop", backdrop_mesh(max(6 * radius, 0.05)))
+        # 6 times the framed size, and larger than the farthest shot camera, so no camera sees its outer side
+        backdrop = put_object(scene, "SA Backdrop",
+                              backdrop_mesh(max(6 * radius, BACKDROP_REACH * settings.camera_reach * MM, 0.05)))
         backdrop.location = floor
     else:
         remove_object("SA Backdrop")

@@ -15,7 +15,9 @@ from sliceranim.core.camera_paths import (
     moving_average,
     part_bounds,
     rising_follow,
+    sphere_in_view,
     turntable,
+    volume_bounds,
 )
 
 BOUNDS = Bounds(center=np.array([0.0, 0.0, 50.0]), radius=50.0)
@@ -114,3 +116,28 @@ def test_final_reveal_as_first_shot_starts_at_the_framing_distance():
     np.testing.assert_allclose(np.linalg.norm(path.location - BOUNDS.center, axis=1), 300.0)
     offset = path.location[0] - BOUNDS.center
     assert math.atan2(offset[1], offset[0]) == pytest.approx(START_AZIMUTH)
+
+
+def test_sphere_in_view():
+    location = np.array([[0.0, -300.0, 0.0], [0.0, -60.0, 0.0]])
+    target = np.zeros((2, 3))
+    assert sphere_in_view(location, target, np.zeros(3), 50.0, math.radians(40)).tolist() == [True, False]
+
+
+def test_rising_follow_keeps_the_whole_part_in_view():
+    """Owner check: the rising follow shot cut off the lower part of a tall print."""
+    tall = Bounds(center=np.array([128.0, 128.0, 76.5]), radius=153.0)
+    head_z = np.linspace(0.2, 153.0, 50)
+    fov = math.radians(22.9)  # vertical field of view at 1920×1080
+    path = rising_follow(tall, None, head_z, fov=fov)
+    np.testing.assert_allclose(path.target[:, 2], head_z)
+    assert sphere_in_view(path.location, path.target, tall.center, tall.radius, fov).all()
+    distance = np.linalg.norm(path.location - path.target, axis=1)
+    assert np.ptp(distance) < 1e-6  # one distance for the whole shot, so the camera does not move in and out
+    assert distance[0] >= framing_distance(tall.radius, fov)
+
+
+def test_volume_bounds_hold_the_p1s_print_volume():
+    bounds = volume_bounds((128.0, 128.0))
+    np.testing.assert_allclose(bounds.center, [128.0, 128.0, 125.0])
+    assert bounds.radius == pytest.approx(math.sqrt(256**2 + 256**2 + 250**2) / 2)

@@ -12,6 +12,7 @@ import numpy as np
 
 MARGIN = 1.15
 START_AZIMUTH = -math.pi / 2 + math.radians(35)  # three-quarter view from the front right
+P1S_VOLUME_MM = (256.0, 256.0, 250.0)  # print volume of the Bambu Lab P1S (printable area and height of its preset)
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,12 @@ def part_bounds(position: np.ndarray) -> Bounds:
     low = position.min(axis=0).astype(np.float64)
     high = position.max(axis=0).astype(np.float64)
     return Bounds(center=(low + high) / 2, radius=max(float(np.linalg.norm(high - low)) / 2, 1e-3))
+
+
+def volume_bounds(center_xy, size=P1S_VOLUME_MM) -> Bounds:
+    """Bounds of the print volume, standing on z = 0 with its middle at `center_xy` (mm)."""
+    center = np.array([center_xy[0], center_xy[1], size[2] / 2], dtype=np.float64)
+    return Bounds(center=center, radius=float(np.linalg.norm(size)) / 2)
 
 
 def field_of_view(lens_mm: float, sensor_mm: float, width_px: int, height_px: int) -> tuple[float, float]:
@@ -76,10 +83,50 @@ def hero(bounds: Bounds, distance: float, frames: int, *, height_angle=math.radi
     return CameraPath(location, _fixed(bounds.center, frames))
 
 
-def rising_follow(bounds: Bounds, distance: float, head_z: np.ndarray, *, height_angle=math.radians(20)) -> CameraPath:
+def sphere_in_view(location, target, center, radius: float, fov: float) -> np.ndarray:
+    """True for each frame where the whole sphere is inside a view cone of angle `fov` around the aim line."""
+    location = np.atleast_2d(np.asarray(location, dtype=np.float64))
+    aim = np.atleast_2d(np.asarray(target, dtype=np.float64)) - location
+    to_center = np.asarray(center, dtype=np.float64) - location
+    distance = np.linalg.norm(to_center, axis=1)
+    cosine = np.einsum("ij,ij->i", aim, to_center) / np.maximum(np.linalg.norm(aim, axis=1) * distance, 1e-12)
+    off_axis = np.arccos(np.clip(cosine, -1.0, 1.0))
+    half_size = np.arcsin(np.clip(radius / np.maximum(distance, 1e-12), 0.0, 1.0))
+    return (distance > radius) & (off_axis + half_size <= fov / 2 + 1e-9)
+
+
+def fit_distance(bounds: Bounds, target: np.ndarray, azimuth: float, elevation: float, fov: float,
+                 margin: float = MARGIN) -> float:
+    """The smallest distance from `target` (F, 3) at which the bounding sphere, grown by the margin,
+    stays in view on every frame. It equals framing_distance() when the target is the center."""
+    target = np.asarray(target, dtype=np.float64)
+    radius = bounds.radius * margin
+    direction = orbit_point(np.zeros(3), np.array(1.0), np.array(azimuth), np.array(elevation))
+
+    def fits(distance: float) -> bool:
+        return bool(sphere_in_view(target + distance * direction, target, bounds.center, radius, fov).all())
+
+    low = framing_distance(bounds.radius, fov, margin)
+    if fits(low):
+        return low
+    high = 2 * low
+    while not fits(high):
+        high *= 2
+    for _ in range(40):
+        middle = (low + high) / 2
+        low, high = (low, middle) if fits(middle) else (middle, high)
+    return high
+
+
+def rising_follow(bounds: Bounds, distance: float | None, head_z: np.ndarray, *, fov: float | None = None,
+                  height_angle=math.radians(20)) -> CameraPath:
+    """Move up with the print head and aim at its height. Without a set distance, the camera stays far
+    enough away that the whole part is in view on every frame (spec section 9)."""
     frames = len(head_z)
     target = _fixed(bounds.center, frames)
     target[:, 2] = head_z
+    if distance is None:
+        distance = fit_distance(bounds, target, START_AZIMUTH, height_angle, fov)
     location = orbit_point(target, np.full(frames, distance), np.full(frames, START_AZIMUTH), np.full(frames, height_angle))
     return CameraPath(location, target)
 

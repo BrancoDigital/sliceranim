@@ -81,3 +81,79 @@ def test_close_up_aims_at_the_current_layer_and_frames_all_of_it():
     expected = 0.001 * (math.hypot(9.55, 9.55) / 2) / math.sin(cameras.smaller_fov(bpy.context.scene) / 2) * 1.15
     assert abs(to_center.length - expected) < 0.002
     assert camera.data.dof.use_dof and abs(camera.data.dof.focus_distance - to_center.length) < 0.002
+
+
+def corners_out_of_frame(scene, frames) -> list:
+    """(frame, corner) pairs where a corner of the part's bounding box is outside the camera image."""
+    from bpy_extras.object_utils import world_to_camera_view
+
+    s = scene.sliceranim
+    tp = importer.toolpath_from_object(s.toolpath_object)
+    low, high = tp.position.min(axis=0) * 0.001, tp.position.max(axis=0) * 0.001
+    corners = [Vector((x, y, z)) for x in (low[0], high[0]) for y in (low[1], high[1]) for z in (low[2], high[2])]
+    markers = sorted(scene.timeline_markers, key=lambda m: m.frame)
+    bad = []
+    for frame in frames:
+        scene.frame_set(frame)
+        camera = [m.camera for m in markers if m.frame <= frame][-1]
+        for corner in corners:
+            x, y, z = world_to_camera_view(scene, camera, corner)
+            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0 and z > 0):
+                bad.append((frame, tuple(round(v, 3) for v in corner)))
+    return bad
+
+
+def test_shots_other_than_close_up_keep_the_whole_part_in_frame():
+    """Owner check: some shots cut off the lower part of the print."""
+    from helpers import box_object, no_bambu
+
+    from sliceranim.blender import shots
+
+    box = box_object(size=0.02)
+    box.scale = (1.0, 1.0, 2.0)  # a tall part, 20 × 20 × 40 mm
+    bpy.context.view_layer.update()
+    with no_bambu():
+        loaded = importer.read_mesh_object(bpy.context, box)
+    importer.build(bpy.context, loaded, importer.prepare(bpy.context, loaded), keep_shots=False)
+    scene = bpy.context.scene
+    s = scene.sliceranim
+    assert [x.camera for x in s.shots] == ["CLOSE_UP", "TURNTABLE", "RISING", "REVEAL"]
+    first_wide = scene.timeline_markers["SA Shot 2"].frame
+    assert corners_out_of_frame(scene, range(first_wide, scene.frame_end + 1, 5)) == []
+    s.format_preset = "SQUARE"
+    shots.rebuild(scene)
+    assert corners_out_of_frame(scene, range(first_wide, scene.frame_end + 1, 5)) == []
+
+
+def test_print_volume_framing_keeps_the_whole_p1s_volume_in_frame():
+    """Owner idea: frame the full print volume of the printer instead of the part."""
+    s = setup()
+    s.framing = "VOLUME"
+    bounds, distance = cameras.framing(bpy.context.scene)
+    np.testing.assert_allclose(bounds.center, [128.0, 128.0, 125.0])
+    assert distance > 1000.0
+    backdrop = bpy.data.objects["SA Backdrop"]
+    assert max(backdrop.dimensions) > 2 * 0.256  # the backdrop grows with the framing, so no horizon shows
+    s.plate_centered_on_part = True
+    bounds, _ = cameras.framing(bpy.context.scene)
+    np.testing.assert_allclose(bounds.center, [5.0, 5.0, 125.0])
+
+
+def test_every_shot_camera_stays_inside_the_backdrop():
+    """A camera outside the backdrop sees the dark outer side of the backdrop wall (a black frame)."""
+    from helpers import box_object, no_bambu
+
+    box = box_object(size=0.02)
+    box.scale = (1.0, 1.0, 2.0)
+    bpy.context.view_layer.update()
+    with no_bambu():
+        loaded = importer.read_mesh_object(bpy.context, box)
+    importer.build(bpy.context, loaded, importer.prepare(bpy.context, loaded), keep_shots=False)
+    scene = bpy.context.scene
+    backdrop = bpy.data.objects["SA Backdrop"]
+    radius = backdrop.dimensions.x / 2
+    for frame in range(1, scene.frame_end + 1, 5):
+        scene.frame_set(frame)
+        for camera in (o for o in bpy.data.objects if o.get(cameras.TAG)):
+            offset = camera.matrix_world.translation - backdrop.location
+            assert offset.xy.length < radius and offset.z < radius, (frame, camera.name)

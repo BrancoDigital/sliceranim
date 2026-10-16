@@ -27,9 +27,8 @@ def smaller_fov(scene) -> float:
 
 
 def framing(scene) -> tuple[paths.Bounds, float]:
-    """Part bounds (mm) and the framing distance (mm) for the output aspect ratio."""
-    settings = scene.sliceranim
-    bounds = paths.Bounds(center=np.array(settings.part_center, dtype=np.float64), radius=settings.part_radius)
+    """Framed bounds (mm), the part or the print volume, and the framing distance (mm) for the output aspect ratio."""
+    bounds = looks.framed_bounds(scene.sliceranim)
     return bounds, paths.framing_distance(bounds.radius, smaller_fov(scene))
 
 
@@ -47,7 +46,8 @@ def path_for_shot(scene, shot, head: np.ndarray, layer: np.ndarray, layer_info, 
     if shot.camera == HERO:
         return paths.hero(bounds, distance, count, height_angle=shot.hero_height, side_angle=shot.hero_side)
     if shot.camera == RISING:
-        return paths.rising_follow(bounds, shot.rising_distance or distance, head[:, 2], height_angle=shot.rising_height)
+        return paths.rising_follow(bounds, shot.rising_distance or None, head[:, 2], fov=smaller_fov(scene),
+                                   height_angle=shot.rising_height)
     if shot.camera == CLOSE_UP:
         centers, radii = layer_info
         index = layer.astype(np.int64)
@@ -81,10 +81,15 @@ def _custom_pose(scene, obj) -> tuple[np.ndarray, np.ndarray]:
 
 
 def build(scene, plan, tp) -> list:
-    """Make one camera per shot with keyframes for its frames. Return the camera objects in shot order."""
+    """Make one camera per shot with keyframes for its frames. Return the camera objects in shot order.
+
+    Also store the distance of the farthest camera from the framed center, so the backdrop can enclose it.
+    """
     remove_shot_cameras()
     settings = scene.sliceranim
     layer_info = paths.layer_bounds(tp.position, tp.layer_start)
+    center = looks.framed_bounds(settings).center
+    reach = 0.0
     result = []
     previous = None
     for row, shot in enumerate(settings.shots):
@@ -111,5 +116,7 @@ def build(scene, plan, tp) -> list:
         keys.write_vector(obj, "location", frames, path.location * MM, keys.LINEAR)
         keys.write_vector(obj, "rotation_euler", frames, eulers(path.location, path.target), keys.LINEAR)
         previous = (path.location[-1], path.target[-1])
+        reach = max(reach, float(np.linalg.norm(path.location - center, axis=1).max()))
         result.append(obj)
+    settings.camera_reach = reach
     return result

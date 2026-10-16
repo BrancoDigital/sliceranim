@@ -73,3 +73,14 @@ def test_sample_stl_from_the_blender_stl_import_slices_like_the_project():
     print(f"    use selected: {seconds:.2f} s, {s.layer_count} layers, {s.point_count} points after merging")
     assert (s.source_kind, s.layer_count, s.used_fallback) == ("MESH", 764, False)
     assert seconds < 20.0
+
+
+def test_sample_stays_in_frame_outside_the_close_up_shot():
+    """Owner check: the lower part of the sample was cut off in some shots."""
+    from test_cameras import corners_out_of_frame
+
+    need_sample()
+    load(SAMPLE_3MF)
+    scene = bpy.context.scene
+    first_wide = scene.timeline_markers["SA Shot 2"].frame
+    assert corners_out_of_frame(scene, range(first_wide, scene.frame_end + 1, 10)) == []

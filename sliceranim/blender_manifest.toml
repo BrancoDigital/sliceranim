@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "sliceranim"
-version = "0.1.0"
+version = "0.1.1"
 name = "Slicer Animator"
 tagline = "Animate a 3D print growing layer by layer from real G-code"
 maintainer = "Luis Branco <luis@brancooo.com>"

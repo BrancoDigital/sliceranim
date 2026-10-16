@@ -5,6 +5,7 @@ import os
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, StringProperty
 
+from .. import version
 from ..core.errors import OPEN_MESH, SlicerAnimError, too_many_polygons
 from ..core.toolpaths import estimate_polygons
 from . import importer, looks, nodes, output, preview, props, shots
@@ -305,6 +306,7 @@ class SLICERANIM_PT_source(_Panel, bpy.types.Panel):
         layout.operator(SLICERANIM_OT_use_selected.bl_idname, icon="MESH_DATA")
         layout.prop(settings, "layer_height", text="Layer height (STL, mesh)")
         if settings.toolpath_object is None:
+            layout.label(text=f"Slicer Animator {version()}")
             return
         layer_height_changed = (settings.source_kind in ("STL", "MESH")
                                 and abs(settings.layer_height - settings.built_layer_height) > 1e-6)
@@ -322,6 +324,7 @@ class SLICERANIM_PT_source(_Panel, bpy.types.Panel):
             box.label(text="Fallback slicer: 2 walls, no infill.", icon="INFO")
             box.label(text="Install Bambu Studio for a full slice.")
         layout.operator(SLICERANIM_OT_reset_defaults.bl_idname, icon="LOOP_BACK")
+        layout.label(text=f"Slicer Animator {version()}")
 
 
 class SLICERANIM_PT_look(_Panel, bpy.types.Panel):

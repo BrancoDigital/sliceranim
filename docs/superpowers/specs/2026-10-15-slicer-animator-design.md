@@ -431,6 +431,7 @@ The frame rate of the preview on the reference machine is not measured yet. The 
 3. License: GPL-3.0-or-later. Blender requires this license for add-ons that use its Python API.
 4. Dependencies: none outside Blender. Blender ships with numpy.
 5. Minimum Blender version: 5.2.0.
+6. Version numbers are 0.1.x while the owner checks the add-on. Each build that goes to the owner gets the next patch number and an entry in `CHANGELOG.md`. The version is set only in `blender_manifest.toml`. The Source section of the panel shows it.
 
 ## 14. Code layout
 

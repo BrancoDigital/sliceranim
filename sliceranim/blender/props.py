@@ -144,6 +144,10 @@ class SLICERANIM_PG_settings(bpy.types.PropertyGroup):
     backdrop_color: FloatVectorProperty(name="Backdrop color", subtype="COLOR", size=3, min=0.0, max=1.0,
                                         default=(0.693, 0.693, 0.693), update=_looks)  # #D9D9D9 in linear color
     lights: BoolProperty(name="Lights", default=True, update=_looks)
+    light_color: FloatVectorProperty(name="Light color", subtype="COLOR", size=3, min=0.0, max=1.0,
+                                     default=(1.0, 1.0, 1.0), update=_looks)
+    light_intensity: FloatProperty(name="Light intensity", description="Multiplies the power of the three lights",
+                                   default=1.0, min=0.0, soft_max=3.0, update=_looks)
     plate_mat: BoolProperty(name="Plate mat", default=False, update=_looks)
     nozzle: BoolProperty(name="Nozzle tip", default=False, update=_looks)
     # Shots
@@ -168,7 +172,7 @@ USER_SETTINGS = (
     "use_file_color", "color", "finish", "highlight", "highlight_color", "highlight_layers",
     "ghost", "ghost_use_filament_color", "ghost_color", "ghost_opacity",
     "strand_sides", "viewport_strand_sides", "merge_angle", "backdrop", "backdrop_color",
-    "lights", "plate_mat", "nozzle",
+    "lights", "light_color", "light_intensity", "plate_mat", "nozzle",
     "format_preset", "custom_width", "custom_height", "fps", "file_type", "output_folder",
 )
 

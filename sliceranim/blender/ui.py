@@ -348,6 +348,9 @@ class SLICERANIM_PT_look(_Panel, bpy.types.Panel):
         if settings.backdrop:
             layout.prop(settings, "backdrop_color")
         layout.prop(settings, "lights")
+        if settings.lights:
+            layout.prop(settings, "light_color")
+            layout.prop(settings, "light_intensity")
         layout.prop(settings, "plate_mat")
         layout.prop(settings, "nozzle")
 

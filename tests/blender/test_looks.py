@@ -146,3 +146,15 @@ def test_output_folder_is_made_when_you_save_the_file_after_loading():
     folder = Path(tempfile.mkdtemp(prefix="sliceranim_saved_"))
     bpy.ops.wm.save_as_mainfile(filepath=str(folder / "test.blend"))
     assert (folder / "renders").is_dir()
+
+
+def test_light_color_and_intensity_reach_the_three_lights():
+    s = setup()
+    looks.apply(bpy.context.scene)
+    before = {name: bpy.data.lights[name].energy for name in looks.LIGHTS}
+    s.light_color = (1.0, 0.5, 0.25)
+    s.light_intensity = 0.5
+    for name in looks.LIGHTS:
+        light = bpy.data.lights[name]
+        np.testing.assert_allclose(tuple(light.color), (1.0, 0.5, 0.25), rtol=1e-6)
+        assert abs(light.energy - 0.5 * before[name]) < 1e-6 * before[name]

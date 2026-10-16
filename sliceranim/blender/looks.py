@@ -232,12 +232,14 @@ def _aim(obj, target: Vector) -> None:
 
 
 def _update_lights(scene, center: Vector, radius: float) -> None:
+    settings = scene.sliceranim
     distance = max(4 * radius, 0.05)
     for name, (azimuth, elevation, factor) in LIGHTS.items():
         light = bpy.data.lights.get(name) or bpy.data.lights.new(name, "AREA")
         light.shape = "DISK"
         light.size = 2 * radius
-        light.energy = factor * distance**2
+        light.energy = factor * distance**2 * settings.light_intensity
+        light.color = settings.light_color
         obj = put_object(scene, name, light)
         a = START_AZIMUTH + azimuth
         obj.location = center + distance * Vector(

@@ -324,7 +324,7 @@ Close-up smoothing is a moving average of the layer center and the layer size ov
 | Finish presets | Matte, Glossy, Silk, Translucent. Each preset sets roughness, specular, sheen, and transmission. | Matte |
 | Active-layer highlight | The material mixes an emission color with the filament color by the `heat` attribute. | On, orange `#FF6A1A`, 3 layers |
 | Studio backdrop | A curved floor-and-wall mesh with no visible horizon, 6 times the size of the part | Light gray `#D9D9D9` |
-| Lights | Key, fill, and rim area lights, scaled to the size of the part | On |
+| Lights | Key, fill, and rim area lights, scaled to the size of the part. You set one color and one intensity for all three. The intensity multiplies the power of each light. | On, white, intensity 1.0 |
 | Plate mat | A 256 mm × 256 mm plane at z = 0 with a procedural textured PEI material. No image files. | Off |
 | Nozzle tip | A brass cone, 6 mm high, parented to the print head. Visible only in Line shots. | Off |
 | Ghost | A transparent material on the ghost shell (section 7, step 8). Eevee uses the Dithered render method. You set the color and the opacity. | Off, filament color, 15% opacity |

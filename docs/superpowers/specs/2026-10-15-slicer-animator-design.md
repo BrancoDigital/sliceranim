@@ -46,6 +46,7 @@ The users are the owner and a small group of people that the owner sends the ext
 7. Smooth camera blends between shots. Version 1 uses hard cuts.
 8. Headless slicing with OrcaSlicer. The OrcaSlicer 2.3.2 command line refuses project files that Bambu Studio 2.08 saved.
 9. Tests on Windows and Linux.
+10. Save and load the settings (look, shots, framing, and output) as a preset file, so that different STL files get identical shots. The owner asked for this on 2026-10-17.
 
 ## 3. Terms
 
@@ -405,7 +406,7 @@ Preview plays the video in the 3D view. It does not render, and you do not chang
 
 The Preview button then changes to Exit Preview. Exit Preview stops playback and restores the view, the shading, and the playback setting that you had before.
 
-The frame rate of the preview on the reference machine is not measured yet. The first Blender test measures it.
+On the reference machine, the owner reported on 2026-10-17 that the preview of the sample plays well. The frame rate was not measured as a number.
 
 ## 12. Errors
 
@@ -483,6 +484,7 @@ A throwaway probe ran on 2026-10-15 on an Apple M1 with 8 GB of memory, Blender 
 | Build mesh with attributes | 0.18 s |
 | Complete print as strands (6 sides) | 1.9 million polygons |
 | Eevee render at 960×960, after shader compile | 3.4 s per frame |
+| Preview in the 3D view, viewport strand sides 4 | Plays well (owner check, 2026-10-17). Not measured in fps. |
 
 Estimated render time for a 30-second video at 1080p and 30 fps: 1 to 1.5 hours. 4K takes about four times longer.
 

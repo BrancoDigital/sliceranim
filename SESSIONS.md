@@ -6,13 +6,49 @@ This file records each work session on Slicer Animator and the project status af
 
 | Item | Status |
 |---|---|
-| Phase | Planning done. The plan is filed and waits for execution in a new session. |
-| Spec | `docs/superpowers/specs/2026-10-15-slicer-animator-design.md` (approved 2026-10-15) |
-| Implementation plan | `docs/superpowers/plans/2026-10-15-slicer-animator.md` (17 tasks, filed) |
-| Plugin code | Not started in the repository. The plan code was tested in a scratch copy only. |
-| Next step | In a new session, pick subagent-driven or native execution and run the plan from Task 1. |
+| Phase | Version 1 is built. The owner check is partly done: previews work. The render check and three more items are open. |
+| Version | 0.1.1 (`dist/sliceranim-0.1.1.zip`). `CHANGELOG.md` lists the changes in each build. |
+| Branch | `feature/slicer-animator-v1`, 29 commits after `main`. It is not merged into `main` yet. |
+| Tests | 76 Blender tests and 102 unit tests pass. One unit test skips until the OrcaSlicer sample exists. |
+| Spec | `docs/superpowers/specs/2026-10-15-slicer-animator-design.md`, updated with every owner change |
+| Plan | `docs/superpowers/plans/2026-10-15-slicer-animator.md`. Tasks 1 to 16 are done. Task 17 waits for the open owner check items. |
+| Next step | The owner renders the sample video (owner check item 7) when the machine is free. Then finish Task 17, run the final review of the branch, and merge. |
+
+Open owner check items (plan Task 17, step 5):
+
+1. Item 6: drag `slices/sample/plate_1.gcode` onto the 3D view.
+2. Item 7: render the sample to MP4 at 1920×1080 and 30 fps. Expect 1 to 1.5 hours.
+3. Item 8: close Blender, open the .blend again, and compare frames 120, 400, and 700.
+4. Item 9: export an OrcaSlicer G-code file to `samples/orca_sample.gcode` and run `make test`.
+
+Ideas for the next version:
+
+1. Save and load the settings (look, shots, framing, and output) as a preset file, so that different STL files get identical shots.
 
 ## Log
+
+### Session 3: 2026-10-15 to 2026-10-17, implementation and owner check
+
+Goal: build version 1 from the plan, then fix what the owner finds in Blender.
+
+Done:
+
+1. The owner chose native execution. Tasks 1 to 16 of the plan are done on branch `feature/slicer-animator-v1`, each with tests that failed first.
+2. Owner check round 1 (build 0.1.0): Add Shot and the End checkbox now keep the shot list valid. Added Reset to Defaults. The output folder is made for you. Preview hides the overlays.
+3. Owner check round 2 (build 0.1.0): Use Selected Object froze Blender, because the Blender STL import puts 1 mm at 1 unit. A mesh larger than 1000 mm is now read at 1 unit = 1 mm. STL files and mesh objects now slice with Bambu Studio and its system presets, so the print has infill and top layers. Added Layer height, Light color, Light intensity, and Nozzle size. The nozzle now shows in Layer shots too.
+4. Owner check round 3 (build 0.1.1): every shot except Close-up keeps the whole part in the image. Added Framing (Part or the P1S print volume). The backdrop grows to enclose the farthest camera. Builds are numbered 0.1.x and the panel shows the version.
+5. The owner reports that the previews work well. The preview frame rate was not measured as a number.
+
+Findings:
+
+1. Bambu Studio slices an STL from the command line only with flat presets. The plugin merges the `inherits` chain of the system presets and names the preset in its own `inherits` field. Spec section 6.3 has the details.
+2. `samples/sample.stl` through the Blender STL import and Use Selected Object: 5 seconds, 764 layers, and 307,953 points. At a layer height of 0.28 mm: 546 layers and 244,091 points.
+
+Open points:
+
+1. The render check and owner check items 6, 8, and 9 (see the status above).
+2. Task 17 steps 6 and 7, the final review of the whole branch, and the merge into `main`.
+3. The owner backs up the repository to GitHub and to the local Forgejo server. The repository has no remotes yet.
 
 ### Session 2: 2026-10-15, spec review
 

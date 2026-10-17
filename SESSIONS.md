@@ -48,7 +48,7 @@ Open points:
 
 1. The render check and owner check items 6, 8, and 9 (see the status above).
 2. Task 17 steps 6 and 7, the final review of the whole branch, and the merge into `main`.
-3. Back up to the local Forgejo server. GitHub is done: `origin` is `git@github.com:BrancoDigital/sliceranim.git` (public), with both branches pushed on 2026-10-17.
+3. The owner sets up the local Forgejo server as a mirror of GitHub. GitHub is done: `origin` is `git@github.com:BrancoDigital/sliceranim.git` (public), with both branches pushed on 2026-10-17.
 
 ### Session 2: 2026-10-15, spec review
 
